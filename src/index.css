@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+:root {
+  padding: 0px;
+  margin: -2px;
+  background-color: #fff;
+}
+
+.container {
+  background: #ffffff;
+}
+
+body {
+  background-color: white;
+}
+
+.primary {
+  background-color: "#113E21";
+  color: "#113E21"
+}
+
+.bg-primary {
+  background-color: "#113E21";
+}
+
+.bg-primary {
+  background-color: "#113E21";
+  color: "#113E21";
+}
+
+.accent {
+  background-color: "#B38B59";
+  color: "#B38B59";
+}
+
+.light {
+  background-color: "#F0F0F0";
+  color: "#F0F0F0";
+}
+
+.soft {
+  background-color: "#FEFEFE";
+  color: "#FEFEFE"
+}
+
+.dark {
+  background-color: "#0b2706"
+}
+
+.lime {
+  background-color: "#afd494"
+}
+
+.deep {
+  background-color: "#274b24"
+}
+
+.light {
+  background-color: "#fefefe"
+}
+
+.bg-dark {
+  background-color: "#0b2706"
+}
+
+.bg-lime {
+  background-color: "#afd494"
+}
+
+.bg-deep {
+  background-color: "#274b24"
+}
+
+.bg-light {
+  background-color: "#fefefe"
+}
+
+.text-dark {
+  background-color: "#0b2706"
+}
+
+.text-lime {
+  background-color: "#afd494"
+}
+
+.text-deep {
+  background-color: "#274b24"
+}
+
+.text-light {
+  background-color: "#fefefe"
+}
+
+.ecommerce-form {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.ecommerce-form h2 {
+  margin-bottom: 20px;
+  color: #333;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #555;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: #ff4444;
+}
+
+.error-message {
+  color: #ff4444;
+  font-size: 14px;
+  margin-top: 5px;
+  display: block;
+}
+
+button[type="submit"] {
+
+  color: black;
+}
+
+button[type="submit"]:hover {
+  background-color: #ffffff;
+}
+
+button[type="submit"].submitting {
+  background-color: #ffffff;
+  cursor: not-allowed;
+}
+
+.success-message {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #d4edda;
+  color: #155724;
+  border-radius: 4px;
+  text-align: center;
+}
+
+/* :root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+
+  a:hover {
+    color: #747bff;
+  }
+
+  button {
+    background-color: #f9f9f9;
+  }
+} */
