@@ -698,6 +698,11 @@ export default function ProductDetail() {
           ) : null}
         </div>
 
+        {/* Reassurance Line */}
+        <p className="text-xs text-gray-500 mt-2 italic">
+          Most customers first discover us on Instagram — this website uses the same verified inventory.
+        </p>
+
         {hasVariationsProduct && activeVariation && (
           <div className="text-sm text-gray-600 space-x-3">
             <span className="font-medium">Variant:</span>
@@ -836,6 +841,31 @@ export default function ProductDetail() {
           )}
         </div>
 
+        {/* Why Iceyout? Section */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">
+            Why Iceyout?
+          </h3>
+          <div className="space-y-2.5">
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Same look & weight as high-end originals</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Premium finishing — no cheap feel</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Personally quality-checked before shipping</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Support available via Instagram & WhatsApp</span>
+            </div>
+          </div>
+        </div>
+
         {product.warranty && (
           <div className="border-b border-gray-200 pb-6">
             <button
@@ -958,20 +988,24 @@ export default function ProductDetail() {
           </button>
         </div>
 
-        {/* Trust Badge Section */}
-        <div className="pt-4 text-center">
-          <div className="flex flex-col items-center space-y-2 text-sm text-gray-600">
-            <div className="flex items-center">
-              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
-              <span>Secure Checkout</span>
+        {/* Trust Bar */}
+        <div className="pt-4 pb-2">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
+            <div className="flex items-center whitespace-nowrap">
+              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
+              <span>Trusted by 1,000+ customers</span>
             </div>
-            <div className="flex items-center">
-              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
-              <span>Tracked Worldwide Shipping</span>
+            <div className="flex items-center whitespace-nowrap">
+              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
+              <span>Secure & encrypted checkout</span>
             </div>
-            <div className="flex items-center">
-              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
-              <span>Quality Checked Before Dispatch</span>
+            <div className="flex items-center whitespace-nowrap">
+              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
+              <span>Worldwide insured shipping</span>
+            </div>
+            <div className="flex items-center whitespace-nowrap">
+              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
+              <span>WhatsApp support before & after delivery</span>
             </div>
           </div>
         </div>
