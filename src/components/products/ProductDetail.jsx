@@ -1004,6 +1004,31 @@ export default function ProductDetail() {
           </div>
         )}
 
+        {/* Payment Reassurance Section */}
+        <div className="pt-4 pb-3 space-y-3">
+          <div className="flex items-center justify-center text-xs text-gray-600 text-center px-2">
+            <span>🔒 Buyer protection applies · Secure PayPal & card checkout</span>
+          </div>
+          <div className="flex items-center justify-center gap-3 opacity-50">
+            {/* PayPal */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-medium text-gray-400 tracking-wide">PayPal</span>
+            </div>
+            {/* Visa */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">VISA</span>
+            </div>
+            {/* Mastercard */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">MC</span>
+            </div>
+            {/* American Express */}
+            <div className="flex items-center">
+              <span className="text-[9px] font-semibold text-gray-400 tracking-wide">AMEX</span>
+            </div>
+          </div>
+        </div>
+
         <div className="flex space-x-4 pt-2">
           <button
             className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
