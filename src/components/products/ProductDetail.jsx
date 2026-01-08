@@ -786,6 +786,31 @@ export default function ProductDetail() {
           ))}
         </div>
 
+        {/* Why Customers Choose This */}
+        <div className="border-b border-gray-200 pb-6">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">
+            Why Customers Choose This
+          </h3>
+          <div className="space-y-2">
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Premium wrist presence</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Inspected for finish and detailing</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Built for daily wear</span>
+            </div>
+            <div className="flex items-start">
+              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700">Trusted by first-time and repeat buyers</span>
+            </div>
+          </div>
+        </div>
+
         <div className="border-b border-gray-200 pb-6">
           <button
             onClick={() => toggleSection("description")}
@@ -932,6 +957,25 @@ export default function ProductDetail() {
             Buy Now
           </button>
         </div>
+
+        {/* Trust Badge Section */}
+        <div className="pt-4 text-center">
+          <div className="flex flex-col items-center space-y-2 text-sm text-gray-600">
+            <div className="flex items-center">
+              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
+              <span>Secure Checkout</span>
+            </div>
+            <div className="flex items-center">
+              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
+              <span>Tracked Worldwide Shipping</span>
+            </div>
+            <div className="flex items-center">
+              <Check className="w-4 h-4 text-gray-700 mr-1.5" />
+              <span>Quality Checked Before Dispatch</span>
+            </div>
+          </div>
+        </div>
+
         {/* <ProductReviews productId={product.$id} /> */}
       </div>
     );
