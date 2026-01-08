@@ -1056,10 +1056,6 @@ export default function ProductDetail() {
             <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
             <span className="text-sm text-gray-700 leading-relaxed">WhatsApp support before & after delivery</span>
           </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Trusted by 1,000+ customers worldwide</span>
-          </div>
         </div>
 
         {/* Trust Badges */}
