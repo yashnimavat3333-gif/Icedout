@@ -984,38 +984,28 @@ export default function ProductDetail() {
           </button>
         </div>
 
-        {/* Reassurance Stack */}
-        <div className="pt-5 pb-3 space-y-2.5">
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Trusted by 1,000+ customers worldwide</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Secure & encrypted checkout — your payment is protected</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Worldwide insured shipping with full tracking</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Personal WhatsApp support before & after delivery</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Ready stock — ships in 24–48 hours</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Limited pieces crafted per batch for quality control</span>
-          </div>
-          <div className="pt-2 mt-3 border-t border-gray-100">
-            <p className="text-xs text-gray-500 leading-relaxed">
-              Most customers first discover us on Instagram — and stay for the quality.
-            </p>
-          </div>
-        </div>
+        {/* Trust Badges */}
+<div className="mt-4 flex flex-wrap gap-2">
+  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+    <span className="text-green-600">✔</span>
+    Trusted by 1,000+ customers
+  </div>
+
+  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+    <span className="text-green-600">🔒</span>
+    Secure & encrypted checkout
+  </div>
+
+  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+    <span className="text-green-600">🚚</span>
+    Worldwide insured shipping
+  </div>
+
+  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+    <span className="text-green-600">💬</span>
+    WhatsApp support before & after delivery
+  </div>
+</div>
 
         {/* <ProductReviews productId={product.$id} /> */}
       </div>
