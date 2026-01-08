@@ -698,10 +698,6 @@ export default function ProductDetail() {
           ) : null}
         </div>
 
-        {/* Reassurance Line */}
-        <p className="text-xs text-gray-500 mt-2 italic">
-          Most customers first discover us on Instagram — this website uses the same verified inventory.
-        </p>
 
         {hasVariationsProduct && activeVariation && (
           <div className="text-sm text-gray-600 space-x-3">
@@ -843,25 +839,25 @@ export default function ProductDetail() {
 
         {/* Why Iceyout? Section */}
         <div className="border-b border-gray-200 pb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">
+          <h3 className="text-sm font-medium text-gray-900 mb-4">
             Why Iceyout?
           </h3>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Same look & weight as high-end originals</span>
+              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700 leading-relaxed">Feel confident wearing — same look, weight, and presence as high-end originals</span>
             </div>
             <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Premium finishing — no cheap feel</span>
+              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700 leading-relaxed">Premium finishing you can feel — no compromises on quality or detail</span>
             </div>
             <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Personally quality-checked before shipping</span>
+              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700 leading-relaxed">Every piece personally inspected — quality-checked before it leaves our hands</span>
             </div>
             <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Support available via Instagram & WhatsApp</span>
+              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+              <span className="text-sm text-gray-700 leading-relaxed">Real support when you need it — reach us on Instagram & WhatsApp anytime</span>
             </div>
           </div>
         </div>
@@ -988,25 +984,36 @@ export default function ProductDetail() {
           </button>
         </div>
 
-        {/* Trust Bar */}
-        <div className="pt-4 pb-2">
-          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-600">
-            <div className="flex items-center whitespace-nowrap">
-              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
-              <span>Trusted by 1,000+ customers</span>
-            </div>
-            <div className="flex items-center whitespace-nowrap">
-              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
-              <span>Secure & encrypted checkout</span>
-            </div>
-            <div className="flex items-center whitespace-nowrap">
-              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
-              <span>Worldwide insured shipping</span>
-            </div>
-            <div className="flex items-center whitespace-nowrap">
-              <Check className="w-3.5 h-3.5 text-gray-700 mr-1.5 flex-shrink-0" />
-              <span>WhatsApp support before & after delivery</span>
-            </div>
+        {/* Reassurance Stack */}
+        <div className="pt-5 pb-3 space-y-2.5">
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Trusted by 1,000+ customers worldwide</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Secure & encrypted checkout — your payment is protected</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Worldwide insured shipping with full tracking</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Personal WhatsApp support before & after delivery</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Ready stock — ships in 24–48 hours</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Limited pieces crafted per batch for quality control</span>
+          </div>
+          <div className="pt-2 mt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Most customers first discover us on Instagram — and stay for the quality.
+            </p>
           </div>
         </div>
 
