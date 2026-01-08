@@ -926,7 +926,7 @@ export default function ProductDetail() {
               className="flex justify-between items-center w-full py-3"
             >
               <h3 className="text-sm font-medium text-gray-900">
-                Warranty Information
+                Warranty & Quality Assurance
               </h3>
               <ChevronRight
                 className={`w-5 h-5 text-gray-500 transition-transform ${
@@ -936,13 +936,18 @@ export default function ProductDetail() {
             </button>
             {expandedSections.warranty && (
               <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-                {product.warranty ? (
-                  <div>{parse(product.warranty)}</div>
-                ) : (
-                  <p className="text-gray-500">
-                    No warranty information available
+                <div>
+                  <p className="mb-3">
+                    This timepiece is covered by a 12-month seller warranty provided by Iceyout.
                   </p>
-                )}
+                  <p className="mb-3">
+                    We guarantee proper functionality, finishing quality, and performance under normal use.<br />
+                    If any manufacturing or functional issue arises, we will repair, replace, or resolve it at no extra cost.
+                  </p>
+                  <p>
+                    This warranty is handled directly by Iceyout and is independent of any brand manufacturer.
+                  </p>
+                </div>
               </div>
             )}
           </div>
@@ -1097,6 +1102,7 @@ export default function ProductDetail() {
     getDisplayPricing,
     isInStock,
     toNumber,
+    socialProofData,
   ]);
 
   const relatedProductsSection = useMemo(
