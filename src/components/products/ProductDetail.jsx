@@ -970,13 +970,35 @@ export default function ProductDetail() {
             </button>
             {expandedSections.shipping && (
               <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-                {product.shipping ? (
-                  <div>{parse(product.shipping)}</div>
-                ) : (
-                  <p className="text-gray-500">
-                    No shipping information available
+                <div>
+                  <p className="mb-4">
+                    Orders are processed within 1–2 business days.<br />
+                    Delivery typically takes 4–5 business days worldwide.
                   </p>
-                )}
+                  
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-start">
+                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Fully insured shipping</span>
+                    </div>
+                    <div className="flex items-start">
+                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Secure packaging for high-value items</span>
+                    </div>
+                    <div className="flex items-start">
+                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">FedEx Express shipping service</span>
+                    </div>
+                    <div className="flex items-start">
+                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-gray-700">Trusted global logistics partners</span>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-gray-700 italic">
+                    If there is any delay, loss, or issue during transit, we take full responsibility and ensure a replacement or full resolution.
+                  </p>
+                </div>
               </div>
             )}
           </div>
