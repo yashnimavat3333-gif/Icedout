@@ -530,9 +530,9 @@ export default function ProductDetail() {
     if (!activeSlide) return;
     const video = activeSlide.querySelector("video");
     if (video) {
-      video.muted = true;
+      // Ensure playsInline is set (video element already has controls and muted={false})
       video.playsInline = true;
-      video.play().catch(() => {});
+      // Don't auto-play - let user control via controls attribute
     }
   }, []);
 
