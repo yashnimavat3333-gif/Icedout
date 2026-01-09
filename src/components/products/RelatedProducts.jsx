@@ -22,11 +22,15 @@ export default function RelatedProducts({ relatedProducts }) {
             <img
               src={
                 item.images?.length
-                  ? productService.getImagePreview(item.images[0])
+                  ? productService.getOptimizedImageUrl(item.images[0], 800)
                   : "/placeholder-product.jpg"
               }
               alt={item.name}
+              width={400}
+              height={533}
               className="h-40 w-full object-cover group-hover:scale-105 transition-transform"
+              loading="lazy"
+              decoding="async"
               onError={(e) => (e.target.src = "/placeholder-product.jpg")}
             />
             <div className="p-3 space-y-1">

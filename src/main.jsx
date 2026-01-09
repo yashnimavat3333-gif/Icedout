@@ -1,41 +1,43 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 import { Provider } from "react-redux";
 import store from "./store/store.js";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import Home from "./pages/Home.jsx";
+import { CartProvider } from "./context/CartContext.jsx";
 import { AuthLayout, Login } from "./components/index.js";
+import SpinnerLoader from "./components/SpinnerLoader.jsx";
+import { loadGtag } from "./lib/analytics.js";
 
-import AddPost from "./pages/AddPost";
-import Signup from "./pages/Signup";
-import EditPost from "./pages/EditPost";
-
-import Post from "./pages/Post";
-
-import AllPosts from "./pages/AllPosts";
+// Critical routes - eagerly loaded (core e-commerce functionality)
+import Home from "./pages/Home.jsx";
+import Signup from "./pages/Signup.jsx";
 import ProductDetail from "./components/products/ProductDetail.jsx";
-import ProductForm from "./components/form/ProductForm.jsx";
 import CategoryPage from "./pages/CategoryPage.jsx";
 import CategoriesPage from "./pages/CategoriesPage.jsx";
 import ProductList from "./components/products/ProductList.jsx";
-import About from "./pages/About.jsx";
-import Contact from "./pages/Contact.jsx";
 import CartPage from "./pages/CartPage.jsx";
-import { CartProvider } from "./context/CartContext.jsx";
 import SearchResults from "./components/SearchBar.jsx";
-import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
-import CreateCategoryForm from "./pages/CreateCategoryForm.jsx";
-import AdminProductPanel from "./components/Admin/AdminProductPanel.jsx";
-import EditProduct from "./pages/EditProduct.jsx";
-import NotFound from "./pages/NotFound.jsx";
 import CheckoutPage from "./pages/Checkout.jsx";
 import ProfilePage from "./pages/Profile.jsx";
 import OrderDetail from "./pages/OrderDetail.jsx";
-import AdminOrders from "./pages/AdminOrders.jsx";
-import AdminReviewPanel from "./pages/AdminReviews.jsx";
-import { loadGtag } from "./lib/analytics.js";
+import ProductForm from "./components/form/ProductForm.jsx";
+
+// Non-critical routes - lazy loaded (admin, static pages, blog)
+const About = lazy(() => import("./pages/About.jsx"));
+const Contact = lazy(() => import("./pages/Contact.jsx"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy.jsx"));
+const NotFound = lazy(() => import("./pages/NotFound.jsx"));
+const AdminProductPanel = lazy(() => import("./components/Admin/AdminProductPanel.jsx"));
+const AdminOrders = lazy(() => import("./pages/AdminOrders.jsx"));
+const AdminReviewPanel = lazy(() => import("./pages/AdminReviews.jsx"));
+const EditProduct = lazy(() => import("./pages/EditProduct.jsx"));
+const CreateCategoryForm = lazy(() => import("./pages/CreateCategoryForm.jsx"));
+const AddPost = lazy(() => import("./pages/AddPost.jsx"));
+const EditPost = lazy(() => import("./pages/EditPost.jsx"));
+const Post = lazy(() => import("./pages/Post.jsx"));
+const AllPosts = lazy(() => import("./pages/AllPosts.jsx"));
 
 const router = createBrowserRouter([
   {
@@ -66,8 +68,9 @@ const router = createBrowserRouter([
         path: "/all-posts",
         element: (
           <AuthLayout authentication>
-            {" "}
-            <AllPosts />
+            <Suspense fallback={<SpinnerLoader />}>
+              <AllPosts />
+            </Suspense>
           </AuthLayout>
         ),
       },
@@ -75,14 +78,19 @@ const router = createBrowserRouter([
         path: "/add-post",
         element: (
           <AuthLayout authentication>
-            {" "}
-            <AddPost />
+            <Suspense fallback={<SpinnerLoader />}>
+              <AddPost />
+            </Suspense>
           </AuthLayout>
         ),
       },
       {
         path: "/post/:slug",
-        element: <Post />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <Post />
+          </Suspense>
+        ),
       },
       {
         path: "/add-product",
@@ -97,8 +105,9 @@ const router = createBrowserRouter([
         path: "/edit-post/:slug",
         element: (
           <AuthLayout authentication>
-            {" "}
-            <EditPost />
+            <Suspense fallback={<SpinnerLoader />}>
+              <EditPost />
+            </Suspense>
           </AuthLayout>
         ),
       },
@@ -120,11 +129,19 @@ const router = createBrowserRouter([
       },
       {
         path: "/about",
-        element: <About />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <About />
+          </Suspense>
+        ),
       },
       {
         path: "/contact",
-        element: <Contact />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <Contact />
+          </Suspense>
+        ),
       },
       {
         path: "/cart",
@@ -136,19 +153,35 @@ const router = createBrowserRouter([
       },
       {
         path: "/privacy",
-        element: <PrivacyPolicy />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <PrivacyPolicy />
+          </Suspense>
+        ),
       },
       {
         path: "/add-category",
-        element: <CreateCategoryForm />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <CreateCategoryForm />
+          </Suspense>
+        ),
       },
       {
         path: "/admin",
-        element: <AdminProductPanel />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <AdminProductPanel />
+          </Suspense>
+        ),
       },
       {
         path: "/edit/:id",
-        element: <EditProduct />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <EditProduct />
+          </Suspense>
+        ),
       },
       {
         path: "/checkout",
@@ -164,15 +197,27 @@ const router = createBrowserRouter([
       },
       {
         path: "/admin-orders",
-        element: <AdminOrders />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <AdminOrders />
+          </Suspense>
+        ),
       },
       {
         path: "/admin-reviews",
-        element: <AdminReviewPanel />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <AdminReviewPanel />
+          </Suspense>
+        ),
       },
       {
         path: "*",
-        element: <NotFound />,
+        element: (
+          <Suspense fallback={<SpinnerLoader />}>
+            <NotFound />
+          </Suspense>
+        ),
       },
     ],
   },

@@ -18,6 +18,7 @@ import SpinnerLoader from "../SpinnerLoader";
 import ProductCard from "./ProductCard";
 import parse from "html-react-parser";
 import ProductReviews from "../Review";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
 const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
 
@@ -64,6 +65,8 @@ const ThumbMedia = React.memo(({ src, alt }) => {
         <img
           src={src}
           alt={alt}
+          width={64}
+          height={64}
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
@@ -72,8 +75,8 @@ const ThumbMedia = React.memo(({ src, alt }) => {
             setMode("tile");
             setLoaded(true);
           }}
-          loading="eager"
-          decoding="sync"
+          loading="lazy"
+          decoding="async"
           style={{ contain: "paint", backfaceVisibility: "hidden" }}
           referrerPolicy="no-referrer"
         />
@@ -147,6 +150,8 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
         <img
           src={media.view}
           alt={name || "Product media"}
+          width={1600}
+          height={1600}
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
@@ -155,8 +160,8 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
             setMode("placeholder");
             setLoaded(true);
           }}
-          loading="eager"
-          decoding="sync"
+          loading={isActive ? "eager" : "lazy"}
+          decoding={isActive ? "sync" : "async"}
         />
       )}
 
@@ -164,9 +169,12 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
         <img
           src={placeholder}
           alt="No media"
+          width={1600}
+          height={1600}
           className="w-full h-full object-cover"
           onLoad={() => setLoaded(true)}
-          loading="eager"
+          loading="lazy"
+          decoding="async"
         />
       )}
     </div>
@@ -192,23 +200,9 @@ export default function ProductDetail() {
   const [error, setError] = useState(null);
   const [selectedVarIndex, setSelectedVarIndex] = useState(0);
 
-  // Zoom modal state (mobile-friendly)
+  // Zoom modal state
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [zoomScale, setZoomScale] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
-  const panRef = useRef({
-    dragging: false,
-    startX: 0,
-    startY: 0,
-    originX: 0,
-    originY: 0,
-  });
-  const pinchRef = useRef({
-    initialDistance: 0,
-    startScale: 1,
-  });
-  const lastTapRef = useRef(0);
 
   const activeIndexRef = useRef(0);
   const { addToCart } = useCart();
@@ -324,11 +318,12 @@ export default function ProductDetail() {
     [getActiveVariation]
   );
 
-  // media processing
+  // media processing with optimized URLs for mobile performance
   const toProcessedMedia = useCallback(
     (images = []) =>
       images.map((fileId) => {
-        const view = productService.getFileView(fileId);
+        // Use optimized URL with max width 1600px for mobile performance
+        const view = productService.getOptimizedImageUrl(fileId, 1600);
         const norm = (u) =>
           typeof u === "string" ? u : u?.href || u?.toString() || "";
         return { fileId, view: norm(view) };
@@ -449,204 +444,11 @@ export default function ProductDetail() {
   // Zoom modal handlers
   const openZoom = useCallback(() => {
     setZoomOpen(true);
-    setZoomScale(1);
-    setPan({ x: 0, y: 0 });
-    pinchRef.current = { initialDistance: 0, startScale: 1 };
   }, []);
 
   const closeZoom = useCallback(() => {
     setZoomOpen(false);
-    setZoomScale(1);
-    setPan({ x: 0, y: 0 });
-    pinchRef.current = { initialDistance: 0, startScale: 1 };
   }, []);
-
-  const changeZoom = useCallback((next) => {
-    setZoomScale((s) => {
-      const ns = Math.min(4, Math.max(0.5, +(s + next).toFixed(3)));
-      if (Math.abs(ns - 1) < 0.001) {
-        setPan({ x: 0, y: 0 });
-      } else {
-        // Constrain pan when zooming to prevent image from moving too far
-        const maxPan = (ns - 1) * 200;
-        setPan(prev => ({
-          x: Math.max(-maxPan, Math.min(maxPan, prev.x)),
-          y: Math.max(-maxPan, Math.min(maxPan, prev.y)),
-        }));
-      }
-      return ns;
-    });
-  }, []);
-
-  const onZoomSlider = useCallback((e) => {
-    const v = Number(e.target.value);
-    setZoomScale(v);
-    if (Math.abs(v - 1) < 0.001) setPan({ x: 0, y: 0 });
-  }, []);
-
-  // pan/pinch helpers
-  const onPanStart = useCallback(
-    (clientX, clientY) => {
-      panRef.current.dragging = true;
-      panRef.current.startX = clientX;
-      panRef.current.startY = clientY;
-      panRef.current.originX = pan.x;
-      panRef.current.originY = pan.y;
-    },
-    [pan.x, pan.y]
-  );
-
-  const onPanMove = useCallback((clientX, clientY) => {
-    if (!panRef.current.dragging) return;
-    const dx = clientX - panRef.current.startX;
-    const dy = clientY - panRef.current.startY;
-    
-    // Calculate bounds to prevent panning too far (with padding)
-    const maxPan = (zoomScale - 1) * 200; // Approximate bounds
-    const newX = Math.max(-maxPan, Math.min(maxPan, panRef.current.originX + dx));
-    const newY = Math.max(-maxPan, Math.min(maxPan, panRef.current.originY + dy));
-    
-    setPan({ x: newX, y: newY });
-  }, [zoomScale]);
-
-  const onPanEnd = useCallback(() => {
-    panRef.current.dragging = false;
-  }, []);
-
-  const getDistance = (t0, t1) => {
-    const dx = t0.clientX - t1.clientX;
-    const dy = t0.clientY - t1.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-  };
-
-  // touch handlers supporting pinch and single-finger pan and double-tap
-  const onTouchStart = useCallback(
-    (ev) => {
-      if (!ev.touches) return;
-      
-      // Prevent default to avoid scrolling and other browser behaviors
-      ev.preventDefault();
-      
-      if (ev.touches.length === 2) {
-        // Start pinch - disable transitions for smooth pinch
-        const d = getDistance(ev.touches[0], ev.touches[1]);
-        pinchRef.current.initialDistance = d;
-        pinchRef.current.startScale = zoomScale;
-        // Reset pan origin when starting pinch
-        panRef.current.dragging = false;
-      } else if (ev.touches.length === 1) {
-        // Double-tap to toggle zoom (optimized for mobile)
-        const now = Date.now();
-        const timeSinceLastTap = now - lastTapRef.current;
-        
-        if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-          // Double tap detected - smooth zoom toggle
-          requestAnimationFrame(() => {
-            if (zoomScale <= 1.05) {
-              setZoomScale(2.5); // Zoom in to 2.5x for detail inspection
-            } else {
-              setZoomScale(1);
-              setPan({ x: 0, y: 0 });
-            }
-          });
-          lastTapRef.current = 0;
-          return;
-        }
-        lastTapRef.current = now;
-        
-        // Start pan if zoomed (smooth drag)
-        if (zoomScale > 1.05) {
-          const touch = ev.touches[0];
-          onPanStart(touch.clientX, touch.clientY);
-        }
-      }
-    },
-    [zoomScale, onPanStart]
-  );
-
-  const onTouchMove = useCallback(
-    (ev) => {
-      if (!ev.touches) return;
-      ev.preventDefault(); // Prevent scrolling while zooming/panning
-      
-      if (ev.touches.length === 2) {
-        // Smooth pinch to zoom - real-time scaling
-        const d = getDistance(ev.touches[0], ev.touches[1]);
-        const initial = pinchRef.current.initialDistance || d;
-        if (initial === 0) {
-          pinchRef.current.initialDistance = d;
-          pinchRef.current.startScale = zoomScale;
-          return;
-        }
-        const startScale = pinchRef.current.startScale || zoomScale;
-        
-        // Calculate scale with smooth interpolation
-        let scale = (startScale * d) / initial;
-        scale = Math.min(4, Math.max(0.5, scale));
-        
-        // Direct update for smooth, real-time pinch response
-        setZoomScale(+scale.toFixed(3));
-      } else if (ev.touches.length === 1 && zoomScale > 1.05) {
-        // Smooth pan when zoomed in
-        const t = ev.touches[0];
-        onPanMove(t.clientX, t.clientY);
-      }
-    },
-    [zoomScale, onPanMove]
-  );
-
-  const onTouchEnd = useCallback(
-    (ev) => {
-      if (!ev.touches || ev.touches.length === 0) {
-        onPanEnd();
-        pinchRef.current.initialDistance = 0;
-        pinchRef.current.startScale = zoomScale;
-      } else {
-        onPanEnd();
-      }
-    },
-    [onPanEnd, zoomScale]
-  );
-
-  // mouse handlers for desktop (drag-to-pan)
-  const onMouseDown = useCallback(
-    (ev) => {
-      if (zoomScale <= 1) return;
-      onPanStart(ev.clientX, ev.clientY);
-      ev.preventDefault();
-    },
-    [zoomScale, onPanStart]
-  );
-
-  const onMouseMove = useCallback(
-    (ev) => {
-      if (panRef.current.dragging) {
-        ev.preventDefault();
-        onPanMove(ev.clientX, ev.clientY);
-      }
-    },
-    [onPanMove]
-  );
-
-  // Scroll wheel zoom for desktop
-  const onWheel = useCallback((ev) => {
-    if (!zoomOpen || zoomScale <= 1) return;
-    
-    ev.preventDefault();
-    const delta = ev.deltaY > 0 ? -0.1 : 0.1;
-    const newScale = Math.min(4, Math.max(1, zoomScale + delta));
-    
-    requestAnimationFrame(() => {
-      setZoomScale(+newScale.toFixed(2));
-      if (Math.abs(newScale - 1) < 0.05) {
-        setPan({ x: 0, y: 0 });
-      }
-    });
-  }, [zoomOpen, zoomScale]);
-
-  const onMouseUp = useCallback(() => {
-    onPanEnd();
-  }, [onPanEnd]);
 
   // navigation functions for prev/next buttons and keyboard
   const goPrev = useCallback(() => {
@@ -673,12 +475,10 @@ export default function ProductDetail() {
       if (e.key === "Escape") closeZoom();
       else if (e.key === "ArrowLeft") goPrev();
       else if (e.key === "ArrowRight") goNext();
-      else if (e.key === "+") changeZoom(0.25);
-      else if (e.key === "-") changeZoom(-0.25);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [zoomOpen, closeZoom, goPrev, goNext, changeZoom]);
+  }, [zoomOpen, closeZoom, goPrev, goNext]);
 
   // memoized values
   const pricing = useMemo(
@@ -1258,7 +1058,7 @@ export default function ProductDetail() {
           playsInline
           style={{
             ...commonStyle,
-            cursor: zoomScale > 1 ? "grab" : "auto",
+            cursor: "auto",
             width: "auto",
             height: "auto",
             maxHeight: "100vh",
@@ -1271,10 +1071,12 @@ export default function ProductDetail() {
       <img
         src={url}
         alt={product?.name || "Product"}
+        width={1600}
+        height={1600}
         draggable={false}
         style={{
           ...commonStyle,
-          cursor: zoomScale > 1 ? "grab" : "auto",
+          cursor: "auto",
           maxWidth: "100%",
           maxHeight: "100%",
         }}
@@ -1348,7 +1150,11 @@ export default function ProductDetail() {
                   <img
                     src={"/placeholder-product.jpg"}
                     alt={product.name || "Product"}
+                    width={1600}
+                    height={1600}
                     className="w-full h-full object-cover"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
               )}
@@ -1372,7 +1178,10 @@ export default function ProductDetail() {
                         title={`thumb-${idx}`}
                         aria-label={`Thumbnail ${idx + 1}`}
                       >
-                        <ThumbMedia src={m.view} alt={`thumb-${idx}`} />
+                        <ThumbMedia 
+                          src={m.fileId ? productService.getOptimizedThumbnailUrl(m.fileId, 160) : m.view} 
+                          alt={`thumb-${idx}`} 
+                        />
                       </button>
                     );
                   })}
@@ -1389,167 +1198,81 @@ export default function ProductDetail() {
         {relatedProductsSection}
       </section>
 
-      {/* Zoom / Fullscreen Modal (mobile-friendly) */}
+      {/* Zoom / Fullscreen Modal - Premium gesture-based zoom */}
       {zoomOpen && (
         <div
           className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onWheel={onWheel}
-          style={{ touchAction: "none" }}
+          onClick={closeZoom}
+          role="dialog"
+          aria-modal="true"
         >
-          {/* Desktop controls - hidden on mobile */}
-          {!isMobile && (
-            <div className="absolute top-4 right-4 flex items-center gap-2 z-40">
-              <button
-                onClick={() => changeZoom(-0.25)}
-                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-                title="Zoom out"
-              >
-                −
-              </button>
-
-              <input
-                type="range"
-                min={0.5}
-                max={4}
-                step={0.01}
-                value={zoomScale}
-                onChange={onZoomSlider}
-                className="w-44"
-              />
-
-              <button
-                onClick={() => changeZoom(0.25)}
-                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-                title="Zoom in"
-              >
-                +
-              </button>
-
-              <button
-                onClick={() => goPrev()}
-                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-                title="Previous"
-              >
-                Prev
-              </button>
-
-              <button
-                onClick={() => goNext()}
-                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-                title="Next"
-              >
-                Next
-              </button>
-
-              <button
-                onClick={closeZoom}
-                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-                title="Close"
-              >
-                Close
-              </button>
-            </div>
-          )}
-
-          {/* Mobile-only close button - subtle and unobtrusive, positioned to avoid gesture interference */}
-          {isMobile && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                closeZoom();
-              }}
-              onTouchStart={(e) => e.stopPropagation()}
-              className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-black/60 hover:bg-black/80 rounded-full text-white touch-manipulation"
-              aria-label="Close zoom"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          )}
-
-          {/* central viewport */}
-          <div
-            className="w-full h-full max-w-[100vw] max-h-[100vh] flex items-center justify-center"
-            onMouseDown={(e) => {
-              if (!isMobile && e.button === 0 && zoomScale > 1)
-                onPanStart(e.clientX, e.clientY);
+          {/* Close button - subtle and unobtrusive */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              closeZoom();
             }}
-            onMouseLeave={() => !isMobile && onMouseUp()}
-            onDoubleClick={() => {
-              if (!isMobile) {
-                if (zoomScale <= 1.01) {
-                  setZoomScale(2);
-                } else {
-                  setZoomScale(1);
-                  setPan({ x: 0, y: 0 });
-                }
-              }
-            }}
-            role="dialog"
-            aria-modal="true"
+            className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-black/60 hover:bg-black/80 rounded-full text-white touch-manipulation"
+            aria-label="Close zoom"
           >
-            <div
-              className="relative overflow-hidden"
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                touchAction: "none",
-              }}
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <div
-                style={{
-                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(1)`,
-                  transition: panRef.current.dragging || pinchRef.current.initialDistance > 0
-                    ? "none"
-                    : "transform 150ms cubic-bezier(0.4, 0, 0.2, 1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                  willChange: panRef.current.dragging || pinchRef.current.initialDistance > 0 ? "transform" : "auto",
-                }}
-                onMouseDown={(e) => {
-                  if (!isMobile && zoomScale > 1) onPanStart(e.clientX, e.clientY);
-                }}
-              >
-                <div
-                  style={{
-                    transform: `scale(${zoomScale})`,
-                    transition: pinchRef.current.initialDistance > 0 || panRef.current.dragging
-                      ? "none"
-                      : "transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
-                    maxWidth: "none",
-                    maxHeight: "none",
-                    display: "inline-block",
-                    transformOrigin: "center center",
-                    willChange: pinchRef.current.initialDistance > 0 ? "transform" : "auto",
-                  }}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+
+          {/* Gesture-based zoom container */}
+          <div
+            className="w-full h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TransformWrapper
+              initialScale={1}
+              minScale={0.5}
+              maxScale={4}
+              doubleClick={{
+                disabled: false,
+                step: 2.5,
+                mode: "zoomIn",
+              }}
+              wheel={{
+                step: 0.1,
+                disabled: isMobile,
+                wheelDisabled: isMobile,
+              }}
+              pan={{
+                disabled: false,
+                velocityDisabled: false,
+                velocitySensitivity: 0.5,
+                velocityEqualToMove: true,
+              }}
+              pinch={{
+                step: 5,
+              }}
+              centerOnInit={true}
+              limitToBounds={false}
+              centerZoomedOut={true}
+              smooth={true}
+              smoothStep={0.03}
+            >
+              {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
+                <TransformComponent
+                  wrapperClass="w-full h-full flex items-center justify-center"
+                  contentClass="flex items-center justify-center"
                 >
                   <ZoomContent />
-                </div>
-              </div>
-            </div>
+                </TransformComponent>
+              )}
+            </TransformWrapper>
           </div>
         </div>
       )}

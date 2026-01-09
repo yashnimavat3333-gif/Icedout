@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import "./App.css";
 import authService from "./appwrite/auth";
@@ -6,21 +6,10 @@ import { login, logout } from "./store/authSlice";
 import { Footer, Header } from "./components";
 import { Outlet } from "react-router-dom";
 import { ReactLenis } from "lenis/react";
-import gsap from "gsap";
 
 function App() {
   const [loading, setLoading] = useState(true);
   const dispatch = useDispatch();
-  const lenisRef = useRef();
-
-  // // ✅ Sync Lenis with GSAP properly
-  // useEffect(() => {
-  //   const raf = (time) => {
-  //     lenisRef.current?.lenis?.raf(time);
-  //   };
-  //   gsap.ticker.add(raf);
-  //   return () => gsap.ticker.remove(raf);
-  // }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });

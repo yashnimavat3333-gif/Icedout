@@ -107,6 +107,33 @@ class ProductService {
         return typeof u === "string" ? u : (u?.href || u?.toString() || "");
     }
 
+    // Optimized image URL with width constraint and quality for mobile performance
+    getOptimizedImageUrl(fileId, maxWidth = 1600) {
+        if (!fileId) return "";
+        try {
+            // Use Appwrite's preview endpoint with width constraint
+            const baseUrl = this.getDirectPreviewUrl(fileId);
+            // Add width and quality parameters for optimization
+            const separator = baseUrl.includes('?') ? '&' : '?';
+            return `${baseUrl}${separator}width=${maxWidth}&quality=85`;
+        } catch {
+            // Fallback to regular view if preview fails
+            return this.getFileView(fileId);
+        }
+    }
+
+    // Optimized thumbnail URL for smaller images
+    getOptimizedThumbnailUrl(fileId, width = 300) {
+        if (!fileId) return "";
+        try {
+            const baseUrl = this.getDirectPreviewUrl(fileId);
+            const separator = baseUrl.includes('?') ? '&' : '?';
+            return `${baseUrl}${separator}width=${width}&quality=80`;
+        } catch {
+            return this.getFilePreview(fileId);
+        }
+    }
+
     getDirectPreviewUrl(fileId) {
         if (!fileId) return "";
         const base = conf.appwriteUrl.replace(/\/v1\/?$/, ""); // normalize

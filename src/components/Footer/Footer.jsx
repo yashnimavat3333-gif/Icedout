@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { FaTwitter, FaFacebookF, FaInstagram } from "react-icons/fa";
+import { Instagram } from "lucide-react";
 
 function Footer() {
   return (
@@ -23,8 +23,9 @@ function Footer() {
               <a
                 href="https://www.instagram.com/iceyoutnyc?utm_source=ig_web_button_share_sheet&igsh=dTI2eGRldm8xZnRl"
                 className="text-gray-400 hover:text-white transition"
+                aria-label="Instagram"
               >
-                <FaInstagram size={18} />
+                <Instagram size={18} />
               </a>
             </div>
           </div>
