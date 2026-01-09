@@ -110,7 +110,9 @@ const Header = () => {
       });
       setIsSearchOpen(false);
     } catch (error) {
-      console.error("Search error:", error);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Search error:", error);
+      }
     }
   };
 
@@ -121,7 +123,9 @@ const Header = () => {
       // keep user on same page but you can also navigate to home/login if desired
       navigate("/");
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV === "development") {
+        console.error(e);
+      }
     }
   };
 
@@ -163,6 +167,10 @@ const Header = () => {
                 src="https://fra.cloud.appwrite.io/v1/storage/buckets/6876009e002e889ffa51/files/687a764a0016b0c7a149/view?project=6875fd9e000f3ec8a910"
                 className="h-[4.5rem]"
                 alt="Logo"
+                width={180}
+                height={72}
+                loading="eager"
+                decoding="async"
               />
             </Link>
 
@@ -286,6 +294,10 @@ const Header = () => {
                   src="https://fra.cloud.appwrite.io/v1/storage/buckets/6876009e002e889ffa51/files/687a764a0016b0c7a149/view?project=6875fd9e000f3ec8a910"
                   className="h-[3rem]"
                   alt="Logo"
+                  width={120}
+                  height={48}
+                  loading="eager"
+                  decoding="async"
                 />
               </Link>
             </div>

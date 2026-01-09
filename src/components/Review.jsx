@@ -103,7 +103,9 @@ export default function Review({ productId }) {
         );
         setModerationQueue(res.documents || []);
       } catch (err) {
-        console.error("fetchQueue", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("fetchQueue", err);
+        }
       }
     };
 
@@ -175,7 +177,9 @@ export default function Review({ productId }) {
         );
         uploaded.push(created.$id || created.id || created);
       } catch (err) {
-        console.error("uploadImages", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("uploadImages", err);
+        }
       }
     }
     return uploaded;
@@ -239,7 +243,9 @@ export default function Review({ productId }) {
             : "")
       );
     } catch (err) {
-      console.error("submitReview", err);
+      if (process.env.NODE_ENV === "development") {
+        console.error("submitReview", err);
+      }
       alert("Failed to submit review.");
     } finally {
       setSubmitting(false);
@@ -262,7 +268,9 @@ export default function Review({ productId }) {
         setReviews((p) => [updated, ...p]);
       }
     } catch (err) {
-      console.error("updateReviewStatus", err);
+      if (process.env.NODE_ENV === "development") {
+        console.error("updateReviewStatus", err);
+      }
       alert("Failed to update review status.");
     }
   };
@@ -286,7 +294,9 @@ export default function Review({ productId }) {
       setPage(nextPage);
       setHasMore(docs.length === PAGE_SIZE);
     } catch (err) {
-      console.error("loadMore", err);
+      if (process.env.NODE_ENV === "development") {
+        console.error("loadMore", err);
+      }
     }
   };
 

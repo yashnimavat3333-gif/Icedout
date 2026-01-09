@@ -76,7 +76,11 @@ const AdminProductPanel = () => {
                   <img
                     src={imageUrl}
                     alt={product.name || "Product"}
+                    width={96}
+                    height={96}
                     className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded border border-gray-200"
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.target.onerror = null; // Prevent infinite loop
                       e.target.style.display = "none";
