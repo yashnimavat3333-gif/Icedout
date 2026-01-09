@@ -453,7 +453,16 @@ export default function ProductDetail() {
   const changeZoom = useCallback((next) => {
     setZoomScale((s) => {
       const ns = Math.min(4, Math.max(0.5, +(s + next).toFixed(3)));
-      if (Math.abs(ns - 1) < 0.001) setPan({ x: 0, y: 0 });
+      if (Math.abs(ns - 1) < 0.001) {
+        setPan({ x: 0, y: 0 });
+      } else {
+        // Constrain pan when zooming to prevent image from moving too far
+        const maxPan = (ns - 1) * 200;
+        setPan(prev => ({
+          x: Math.max(-maxPan, Math.min(maxPan, prev.x)),
+          y: Math.max(-maxPan, Math.min(maxPan, prev.y)),
+        }));
+      }
       return ns;
     });
   }, []);
@@ -480,11 +489,14 @@ export default function ProductDetail() {
     if (!panRef.current.dragging) return;
     const dx = clientX - panRef.current.startX;
     const dy = clientY - panRef.current.startY;
-    setPan({
-      x: panRef.current.originX + dx,
-      y: panRef.current.originY + dy,
-    });
-  }, []);
+    
+    // Calculate bounds to prevent panning too far (with padding)
+    const maxPan = (zoomScale - 1) * 200; // Approximate bounds
+    const newX = Math.max(-maxPan, Math.min(maxPan, panRef.current.originX + dx));
+    const newY = Math.max(-maxPan, Math.min(maxPan, panRef.current.originY + dy));
+    
+    setPan({ x: newX, y: newY });
+  }, [zoomScale]);
 
   const onPanEnd = useCallback(() => {
     panRef.current.dragging = false;
@@ -500,28 +512,35 @@ export default function ProductDetail() {
   const onTouchStart = useCallback(
     (ev) => {
       if (!ev.touches) return;
+      
       if (ev.touches.length === 2) {
-        // start pinch
+        // Start pinch - disable transitions for smooth pinch
         const d = getDistance(ev.touches[0], ev.touches[1]);
         pinchRef.current.initialDistance = d;
         pinchRef.current.startScale = zoomScale;
+        ev.preventDefault();
       } else if (ev.touches.length === 1) {
-        // double-tap to toggle zoom
+        // Double-tap to toggle zoom (more responsive timing)
         const now = Date.now();
-        if (now - lastTapRef.current < 300) {
-          // double tap
-          if (zoomScale <= 1.01) {
-            setZoomScale(2); // quick zoom in
-          } else {
-            setZoomScale(1);
-            setPan({ x: 0, y: 0 });
-          }
+        const timeSinceLastTap = now - lastTapRef.current;
+        
+        if (timeSinceLastTap < 350 && timeSinceLastTap > 0) {
+          // Double tap detected
+          requestAnimationFrame(() => {
+            if (zoomScale <= 1.01) {
+              setZoomScale(2.5); // Zoom in to 2.5x for better detail inspection
+            } else {
+              setZoomScale(1);
+              setPan({ x: 0, y: 0 });
+            }
+          });
           lastTapRef.current = 0;
           ev.preventDefault();
           return;
         }
         lastTapRef.current = now;
-        // start pan if zoomed
+        
+        // Start pan if zoomed
         if (zoomScale > 1) {
           const touch = ev.touches[0];
           onPanStart(touch.clientX, touch.clientY);
@@ -534,13 +553,22 @@ export default function ProductDetail() {
   const onTouchMove = useCallback(
     (ev) => {
       if (!ev.touches) return;
+      ev.preventDefault(); // Prevent scrolling while zooming/panning
+      
       if (ev.touches.length === 2) {
-        // pinch to zoom
+        // Smooth pinch to zoom
         const d = getDistance(ev.touches[0], ev.touches[1]);
         const initial = pinchRef.current.initialDistance || d;
         const startScale = pinchRef.current.startScale || zoomScale;
-        const scale = Math.min(4, Math.max(0.5, (startScale * d) / initial));
-        setZoomScale(+scale.toFixed(3));
+        
+        // Calculate scale with smooth interpolation
+        let scale = (startScale * d) / initial;
+        scale = Math.min(4, Math.max(0.5, scale));
+        
+        // Smooth scale updates using requestAnimationFrame for better performance
+        requestAnimationFrame(() => {
+          setZoomScale(+scale.toFixed(3));
+        });
       } else if (ev.touches.length === 1 && zoomScale > 1) {
         const t = ev.touches[0];
         onPanMove(t.clientX, t.clientY);
@@ -575,11 +603,28 @@ export default function ProductDetail() {
   const onMouseMove = useCallback(
     (ev) => {
       if (panRef.current.dragging) {
+        ev.preventDefault();
         onPanMove(ev.clientX, ev.clientY);
       }
     },
     [onPanMove]
   );
+
+  // Scroll wheel zoom for desktop
+  const onWheel = useCallback((ev) => {
+    if (!zoomOpen || zoomScale <= 1) return;
+    
+    ev.preventDefault();
+    const delta = ev.deltaY > 0 ? -0.1 : 0.1;
+    const newScale = Math.min(4, Math.max(1, zoomScale + delta));
+    
+    requestAnimationFrame(() => {
+      setZoomScale(+newScale.toFixed(2));
+      if (Math.abs(newScale - 1) < 0.05) {
+        setPan({ x: 0, y: 0 });
+      }
+    });
+  }, [zoomOpen, zoomScale]);
 
   const onMouseUp = useCallback(() => {
     onPanEnd();
@@ -1335,6 +1380,8 @@ export default function ProductDetail() {
           onTouchEnd={onTouchEnd}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
+          onWheel={onWheel}
+          style={{ touchAction: "none" }}
         >
           {/* top-right controls - hide range slider on small screens */}
           <div className="absolute top-4 right-4 flex items-center gap-2 z-40">
@@ -1421,17 +1468,18 @@ export default function ProductDetail() {
               }}
             >
               <div
-                style={{
-                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0)`,
-                  transition: panRef.current.dragging
-                    ? "none"
-                    : "transform 120ms",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  maxWidth: "100%",
-                  maxHeight: "100%",
-                }}
+              style={{
+                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(1)`,
+                transition: panRef.current.dragging
+                  ? "none"
+                  : "transform 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                willChange: panRef.current.dragging ? "transform" : "auto",
+              }}
                 onMouseDown={(e) => {
                   if (zoomScale > 1) onPanStart(e.clientX, e.clientY);
                 }}
@@ -1439,10 +1487,14 @@ export default function ProductDetail() {
                 <div
                   style={{
                     transform: `scale(${zoomScale})`,
-                    transition: "transform 80ms",
+                    transition: pinchRef.current.initialDistance > 0 || panRef.current.dragging
+                      ? "none"
+                      : "transform 200ms cubic-bezier(0.4, 0, 0.2, 1)",
                     maxWidth: "none",
                     maxHeight: "none",
                     display: "inline-block",
+                    transformOrigin: "center center",
+                    willChange: pinchRef.current.initialDistance > 0 ? "transform" : "auto",
                   }}
                 >
                   <ZoomContent />
