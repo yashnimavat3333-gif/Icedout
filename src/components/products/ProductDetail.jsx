@@ -265,15 +265,14 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
     );
   }
 
-  return (
-    <div
-      className={`h-full w-full flex items-center justify-center p-0 ${
-        isVideo ? "cursor-default" : "cursor-zoom-in"
-      } relative`}
-      onDoubleClick={handleClick}
-      onClick={handleClick}
-    >
-      {isVideo ? (
+  // Explicit conditional rendering: video OR image, never both
+  if (isVideo && media.view) {
+    return (
+      <div
+        className="h-full w-full flex items-center justify-center p-0 cursor-default relative"
+        onDoubleClick={handleClick}
+        onClick={handleClick}
+      >
         <video
           ref={videoRef}
           src={media.view}
@@ -294,24 +293,33 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
           disablePictureInPicture
           disableRemotePlayback
         />
-      ) : (
-        <img
-          src={media.view}
-          alt={name || "Product media"}
-          width={1600}
-          height={1600}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setError(true);
-            setLoaded(true);
-          }}
-          loading={isActive ? "eager" : "lazy"}
-          decoding={isActive ? "sync" : "async"}
-        />
-      )}
+      </div>
+    );
+  }
+
+  // Render image for non-video media
+  return (
+    <div
+      className="h-full w-full flex items-center justify-center p-0 cursor-zoom-in relative"
+      onDoubleClick={handleClick}
+      onClick={handleClick}
+    >
+      <img
+        src={media.view}
+        alt={name || "Product media"}
+        width={1600}
+        height={1600}
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+        onLoad={() => setLoaded(true)}
+        onError={() => {
+          setError(true);
+          setLoaded(true);
+        }}
+        loading={isActive ? "eager" : "lazy"}
+        decoding={isActive ? "sync" : "async"}
+      />
     </div>
   );
 });
@@ -380,7 +388,7 @@ export default function ProductDetail() {
         const images = Array.isArray(doc.images) ? doc.images : [];
         const processedMedia = images.map((fileId) => {
           try {
-            // Detect video type before URL generation
+            // Detect video type from fileId extension (primary check)
             const fileIdStr = String(fileId || "").toLowerCase();
             const isVideoFile = fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i);
             
@@ -402,7 +410,16 @@ export default function ProductDetail() {
             const norm = (u) =>
               typeof u === "string" ? u : u?.href || u?.toString() || "";
             const viewUrl = norm(view);
-            const mediaType = detectMediaType(fileId, viewUrl);
+            
+            // Determine media type: use fileId detection first, then URL check as fallback
+            let mediaType = "image";
+            if (isVideoFile) {
+              mediaType = "video";
+            } else {
+              // Fallback: check URL if fileId didn't have extension
+              mediaType = detectMediaType(fileId, viewUrl);
+            }
+            
             return { fileId, view: viewUrl, type: mediaType };
           } catch {
             return { fileId, view: "", type: "image" };
