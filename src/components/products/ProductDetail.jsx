@@ -767,6 +767,43 @@ export default function ProductDetail() {
               )}
             </div>
 
+            {/* Social Proof */}
+            {(() => {
+              // Derived variables (no hooks, no side effects)
+              const productStock = toNumber(product?.stock) ?? toNumber(activeVariation?.stock) ?? null;
+              const viewsToday = product?.$id ? (parseInt(product.$id.slice(-2), 16) % 16) + 5 : 12;
+              const locations = ["New York", "California", "Texas", "Florida", "Illinois", "Arizona"];
+              const recentLocation = product?.$id 
+                ? locations[parseInt(product.$id.slice(-3, -2), 16) % locations.length]
+                : "California";
+              const stockDisplay = productStock !== null && productStock > 0 
+                ? (productStock > 10 ? productStock : productStock)
+                : null;
+
+              return (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center text-xs text-gray-600">
+                    <span className="mr-1.5">🔥</span>
+                    <span>{viewsToday} people viewed this product today</span>
+                  </div>
+                  <div className="flex items-center text-xs text-gray-600">
+                    <span className="mr-1.5">🛒</span>
+                    <span>Recently ordered from {recentLocation}</span>
+                  </div>
+                  {stockDisplay !== null && (
+                    <div className={`flex items-center text-xs ${productStock > 10 ? "text-gray-600" : "text-orange-600 font-medium"}`}>
+                      <span className="mr-1.5">⏳</span>
+                      <span>
+                        {productStock > 10 
+                          ? `Only ${stockDisplay} left in stock`
+                          : `Only ${stockDisplay} left in stock - Order soon!`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* Trust Badges */}
             <div className="grid grid-cols-3 gap-4 py-6 border-y border-gray-200">
               {[
