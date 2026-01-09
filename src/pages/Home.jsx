@@ -1,41 +1,31 @@
-import TrustedReviews from "../components/TrustedReviews";
-import React, { useEffect, useState } from "react";
-import appwriteService from "../appwrite/config";
-import {
-  Container,
-  // ProductCard
-} from "../components";
+import React, { lazy, Suspense } from "react";
 import ImageCarousel from "../components/ImageCarousel";
-import ShopByCategory from "../components/ShopByCategory";
-import MostLovedWatches from "../components/MostLovedWatches";
-import ProductsByCategory from "./ProductsByCategory";
+
+// Lazy-load below-the-fold components for faster initial render
+const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
+const ShopByCategory = lazy(() => import("../components/ShopByCategory"));
+const MostLovedWatches = lazy(() => import("../components/MostLovedWatches"));
 
 function Home() {
-  const [products, setProducts] = useState([]);
-
-  // useEffect(() => {
-  //   appwriteService.getPosts().then((response) => {
-  //     if (response && response.documents) {
-  //       setProducts(response.documents);
-  //     }
-  //   });
-  // }, []);
-
   return (
     <div className="w-full min-h-screen bg-white">
-  
-      {/* Hero / Video */}
+      {/* Hero / Video - Above the fold, eager load */}
       <ImageCarousel />
   
-      {/* ⭐ Trusted Reviews (NEW) */}
-      <TrustedReviews />
+      {/* ⭐ Trusted Reviews - Below the fold, lazy load */}
+      <Suspense fallback={null}>
+        <TrustedReviews />
+      </Suspense>
   
-      {/* Categories */}
-      <ShopByCategory />
+      {/* Categories - Below the fold, lazy load */}
+      <Suspense fallback={null}>
+        <ShopByCategory />
+      </Suspense>
   
-      {/* Most Loved */}
-      <MostLovedWatches />
-  
+      {/* Most Loved - Below the fold, lazy load */}
+      <Suspense fallback={null}>
+        <MostLovedWatches />
+      </Suspense>
     </div>
   );
 }
