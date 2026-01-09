@@ -444,38 +444,7 @@ export default function ProductDetail() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
 
-  // ALL HOOKS COMPLETE - NOW SAFE DERIVED VALUES
-  if (loading) return <SpinnerLoader />;
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
-        <p className="text-gray-600 font-medium">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
-  if (!product || !product.name) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
-        <p className="text-gray-600 font-medium">Product not found</p>
-        <button
-          onClick={() => navigate("/shop")}
-          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
-        >
-          Browse Products
-        </button>
-      </div>
-    );
-  }
-
-  // Safe defaults
+  // Safe defaults (computed unconditionally, used later)
   const productName = product?.name || "Product";
   const productCategories = product?.categories || "";
   const productSubtitle = product?.subtitle || "";
@@ -483,6 +452,7 @@ export default function ProductDetail() {
   const productSize = Array.isArray(product?.size) ? product.size : [];
   const productProcessedMedia = product?.processedMedia || [];
 
+  // ALL HOOKS MUST BE CALLED UNCONDITIONALLY BEFORE ANY RETURNS
   // Memoized values
   const pricing = useMemo(
     () => getDisplayPricing(product, selectedVarIndex),
@@ -575,7 +545,7 @@ export default function ProductDetail() {
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomOpen, closeZoom, goPrev, goNext]);
 
-  // Format price display
+  // Format price display (conditional variable, not hook)
   const displayPrice =
     pricing?.price !== null &&
     pricing.price !== undefined &&
@@ -586,7 +556,7 @@ export default function ProductDetail() {
       ? 0
       : null;
 
-  // ZoomContent - images only
+  // ZoomContent - images only (hook must be called unconditionally)
   const ZoomContent = useMemo(() => {
     const currentMedia = productProcessedMedia[selectedImage];
     if (!currentMedia || currentMedia.type === "video") {
@@ -611,6 +581,37 @@ export default function ProductDetail() {
       />
     );
   }, [productProcessedMedia, selectedImage, productName]);
+
+  // ALL HOOKS COMPLETE - NOW SAFE FOR EARLY RETURNS
+  if (loading) return <SpinnerLoader />;
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
+        <p className="text-gray-600 font-medium">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!product || !product.name) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
+        <p className="text-gray-600 font-medium">Product not found</p>
+        <button
+          onClick={() => navigate("/shop")}
+          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
+        >
+          Browse Products
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
