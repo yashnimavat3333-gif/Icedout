@@ -72,20 +72,11 @@ const getActiveVariation = (p, idx) => {
   return list[idx] || list[0] || null;
 };
 
-// Detect media type from fileId or URL
-const detectMediaType = (fileId, viewUrl) => {
-  // Check fileId for video extension
+// Detect media type from fileId extension ONLY
+const detectMediaType = (fileId) => {
   const fileIdStr = String(fileId || "").toLowerCase();
-  if (fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i)) return "video";
-  
-  // Check viewUrl for video extension (handles URLs with query params)
-  const urlStr = String(viewUrl || "").toLowerCase();
-  // Match video extensions before query string, hash, or end of string
-  if (urlStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i)) return "video";
-  
-  // Also check if URL contains video-related paths
-  if (urlStr.includes("/video/") || urlStr.includes("/videos/")) return "video";
-  
+  // Only check for specific video extensions: .mp4, .webm, .mov, .m4v
+  if (fileIdStr.match(/\.(mp4|webm|mov|m4v)(\?|$|#)/i)) return "video";
   return "image";
 };
 
@@ -221,11 +212,8 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
   useEffect(() => {
     if (!isVideo || !videoRef.current) return;
     const video = videoRef.current;
-    if (isActive) {
-      video.play().catch(() => {
-        setError(true);
-      });
-    } else {
+    // Pause video when slide becomes inactive
+    if (!isActive) {
       video.pause();
     }
     return () => {
@@ -237,10 +225,14 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
 
   const handleClick = (e) => {
     if (isVideo) {
-      // Videos: just ensure they play, no zoom
+      // Videos: toggle play/pause, no zoom
       e.stopPropagation();
       if (videoRef.current) {
-        videoRef.current.play().catch(() => {});
+        if (videoRef.current.paused) {
+          videoRef.current.play().catch(() => {});
+        } else {
+          videoRef.current.pause();
+        }
       }
     } else {
       // Images: open zoom modal
@@ -276,7 +268,7 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
         <video
           ref={videoRef}
           src={media.view}
-          preload="auto"
+          preload="metadata"
           className={`w-full h-full object-cover transition-opacity duration-300 ${
             loaded ? "opacity-100" : "opacity-0"
           }`}
@@ -285,10 +277,8 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
             setError(true);
             setLoaded(false);
           }}
-          muted={!isActive}
+          muted={false}
           playsInline
-          autoPlay={isActive}
-          loop
           controls
           disablePictureInPicture
           disableRemotePlayback
@@ -388,9 +378,9 @@ export default function ProductDetail() {
         const images = Array.isArray(doc.images) ? doc.images : [];
         const processedMedia = images.map((fileId) => {
           try {
-            // Detect video type from fileId extension (primary check)
-            const fileIdStr = String(fileId || "").toLowerCase();
-            const isVideoFile = fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i);
+            // Detect video type from fileId extension ONLY (.mp4, .webm, .mov, .m4v)
+            const mediaType = detectMediaType(fileId);
+            const isVideoFile = mediaType === "video";
             
             // Generate URL - videos might need direct file view, images use optimized
             let view;
@@ -410,15 +400,6 @@ export default function ProductDetail() {
             const norm = (u) =>
               typeof u === "string" ? u : u?.href || u?.toString() || "";
             const viewUrl = norm(view);
-            
-            // Determine media type: use fileId detection first, then URL check as fallback
-            let mediaType = "image";
-            if (isVideoFile) {
-              mediaType = "video";
-            } else {
-              // Fallback: check URL if fileId didn't have extension
-              mediaType = detectMediaType(fileId, viewUrl);
-            }
             
             return { fileId, view: viewUrl, type: mediaType };
           } catch {
