@@ -1129,6 +1129,41 @@ export default function ProductDetail() {
     );
   }, [productProcessedMedia, selectedImage, productName]);
 
+  // ALL HOOKS MUST BE COMPLETE BEFORE ANY CONDITIONAL RETURNS
+  // Guard rendering AFTER all hooks are called
+  if (loading) {
+    return <SpinnerLoader />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
+        <p className="text-gray-600 font-medium">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  // Render fallback UI for missing product (never return null - breaks hydration)
+  if (!product || !productName || productName === "Product") {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
+        <p className="text-gray-600 font-medium">Product not found</p>
+        <button
+          onClick={() => navigate("/shop")}
+          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
+        >
+          Browse Products
+        </button>
+      </div>
+    );
+  }
+
   return (
     <>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
