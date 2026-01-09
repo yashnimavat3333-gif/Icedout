@@ -393,7 +393,7 @@ export default function ProductDetail() {
           conf.appwriteProductCollectionId,
           [
             Query.equal("categories", categoryName),
-            Query.notEqual("$id", product.$id),
+            Query.notEqual("$id", product?.$id || id),
             Query.limit(6),
           ]
         );
@@ -486,10 +486,26 @@ export default function ProductDetail() {
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomOpen, closeZoom, goPrev, goNext]);
 
-  // memoized values
+  // Safe defaults for product data - MUST be before all hooks that use them
+  const safeProduct = product || {};
+  const productName = safeProduct?.name || "Product";
+  const productPrice = safeProduct?.price ?? 0;
+  const productImages = Array.isArray(safeProduct?.images) ? safeProduct.images : [];
+  const productSlug = safeProduct?.slug || safeProduct?.$id || id || "";
+  const productDescription = safeProduct?.description || "";
+  const productStock = safeProduct?.stock ?? null;
+  const productBrand = safeProduct?.brand || "";
+  const productCategories = safeProduct?.categories || "";
+  const productSubtitle = safeProduct?.subtitle || "";
+  const productWarranty = safeProduct?.warranty || "";
+  const productShipping = safeProduct?.shipping || "";
+  const productSize = Array.isArray(safeProduct?.size) ? safeProduct.size : [];
+  const productProcessedMedia = Array.isArray(safeProduct?.processedMedia) ? safeProduct.processedMedia : [];
+
+  // memoized values - use safeProduct for consistency
   const pricing = useMemo(
-    () => getDisplayPricing(product, selectedVarIndex),
-    [product, selectedVarIndex, getDisplayPricing]
+    () => getDisplayPricing(safeProduct, selectedVarIndex),
+    [safeProduct, selectedVarIndex, getDisplayPricing]
   );
 
   // Session-safe social proof data (frontend-only, resets per session)
@@ -535,21 +551,30 @@ export default function ProductDetail() {
   }, [id]);
 
   const activeVariation = useMemo(
-    () => getActiveVariation(product, selectedVarIndex),
-    [product, selectedVarIndex, getActiveVariation]
+    () => getActiveVariation(safeProduct, selectedVarIndex),
+    [safeProduct, selectedVarIndex, getActiveVariation]
   );
 
   const hasVariationsProduct = useMemo(
-    () => hasVariations(product),
-    [product, hasVariations]
+    () => hasVariations(safeProduct),
+    [safeProduct, hasVariations]
   );
 
   // Build product info section
   const productInfoSection = useMemo(() => {
-    if (!product || !product.name) return null;
+    if (!product || !productName) {
+      return (
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-[20px] font-normal text-gray-900">Product unavailable</h1>
+            <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">Please try again later</p>
+          </div>
+        </div>
+      );
+    }
 
     const categoryText = useMemo(() => {
-      const categoryLower = product?.categories?.toLowerCase() || "";
+      const categoryLower = productCategories?.toLowerCase() || "";
       if (categoryLower === "luxury watch") {
         return "💎 Set with VVS1 D-Color Moissanite Diamonds · Precision-set for maximum brilliance";
       } else if (categoryLower === "plain watch") {
@@ -559,16 +584,16 @@ export default function ProductDetail() {
       }
       // Default fallback
       return "⭐ Quality-tested & customer-approved · Inspected before dispatch";
-    }, [product?.categories]);
+    }, [productCategories]);
 
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-[20px] font-normal text-gray-900">
-            {product.name || "Product Name"}
+            {productName}
           </h1>
           <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">
-            {product.subtitle || product.categories || "Product Category"}
+            {productSubtitle || productCategories || "Product Category"}
           </p>
 
           <div className="mt-3">
@@ -626,13 +651,13 @@ export default function ProductDetail() {
           </div>
         )}
 
-        {hasVariationsProduct && product.variations && (
+        {hasVariationsProduct && Array.isArray(safeProduct?.variations) && safeProduct.variations.length > 0 && (
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-sm font-medium text-gray-900 mb-2">
               Select Variant:
             </h3>
             <div className="flex flex-wrap gap-2">
-              {product.variations.map((v, idx) => {
+              {safeProduct.variations.map((v, idx) => {
                 const isActive = selectedVarIndex === idx;
                 const inStock = isInStock(v);
                 return (
@@ -657,13 +682,13 @@ export default function ProductDetail() {
           </div>
         )}
 
-        {Array.isArray(product.size) && product.size.length > 0 && (
+        {productSize.length > 0 && (
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-sm font-medium text-gray-900 mb-2">
               Select Size:
             </h3>
             <div className="flex flex-wrap gap-2">
-              {product.size.map((size, index) => (
+              {productSize.map((size, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedSize(size)}
@@ -741,8 +766,8 @@ export default function ProductDetail() {
           </button>
           {expandedSections.description && (
             <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-              {product.description ? (
-                <div>{parse(product.description)}</div>
+              {productDescription ? (
+                <div>{parse(productDescription)}</div>
               ) : (
                 <p className="text-gray-500">No description available</p>
               )}
@@ -775,7 +800,7 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {product.warranty && (
+        {productWarranty && (
           <div className="border-b border-gray-200 pb-6">
             <button
               onClick={() => toggleSection("warranty")}
@@ -809,7 +834,7 @@ export default function ProductDetail() {
           </div>
         )}
 
-        {product.shipping && (
+        {productShipping && (
           <div className="border-b border-gray-200 pb-6">
             <button
               onClick={() => toggleSection("shipping")}
@@ -889,7 +914,7 @@ export default function ProductDetail() {
           <button
             className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
             onClick={() => {
-              if (product.size?.length && !selectedSize) {
+              if (productSize.length > 0 && !selectedSize) {
                 alert("Please select a size before adding to cart.");
                 return;
               }
@@ -903,8 +928,8 @@ export default function ProductDetail() {
                 )
               ) {
                 addToCart({
-                  ...product,
-                  pricing: getDisplayPricing(product, selectedVarIndex),
+                  ...safeProduct,
+                  pricing: getDisplayPricing(safeProduct, selectedVarIndex),
                   selectedVariation: activeVariation,
                   selectedSize: selectedSize || null,
                 });
@@ -918,7 +943,7 @@ export default function ProductDetail() {
           <button
             className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
             onClick={() => {
-              if (product.size?.length && !selectedSize) {
+              if (productSize.length > 0 && !selectedSize) {
                 alert("Please select a size before buying.");
                 return;
               }
@@ -928,18 +953,18 @@ export default function ProductDetail() {
               }
 
               const buyItem = {
-                $id: product.$id ?? product.id,
-                id: product.$id ?? product.id,
-                name: product.name,
-                price: (pricing?.price ?? product.price) || 0,
+                $id: safeProduct.$id ?? safeProduct.id ?? id,
+                id: safeProduct.$id ?? safeProduct.id ?? id,
+                name: productName,
+                price: (pricing?.price ?? productPrice) || 0,
                 quantity: 1,
                 image:
-                  product.processedMedia?.[0]?.view ||
-                  product.thumbnail ||
+                  productProcessedMedia?.[0]?.view ||
+                  safeProduct?.thumbnail ||
                   "/placeholder-product.jpg",
                 selectedSize: selectedSize || null,
                 selectedVariation: activeVariation || null,
-                pricing: getDisplayPricing(product, selectedVarIndex),
+                pricing: getDisplayPricing(safeProduct, selectedVarIndex),
               };
 
               navigate("/checkout", { state: { buyNow: true, item: buyItem } });
@@ -984,7 +1009,7 @@ export default function ProductDetail() {
   </div>
 </div>
 
-        {/* <ProductReviews productId={product.$id} /> */}
+        {/* <ProductReviews productId={safeProduct?.$id || id} /> */}
       </div>
     );
   }, [
@@ -1025,24 +1050,32 @@ export default function ProductDetail() {
     [relatedProducts]
   );
 
-  if (loading) return <SpinnerLoader />;
-  if (error)
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
-        <p className="text-gray-600 font-medium">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  if (!product) return null;
-
   // ZoomContent with local fallback - memoized to prevent re-renders
   const ZoomContent = useMemo(() => {
-    const m = product?.processedMedia?.[selectedImage];
+    if (!productProcessedMedia || productProcessedMedia.length === 0) {
+      return (
+        <img
+          src={UPLOADED_FALLBACK}
+          alt={productName}
+          width={1600}
+          height={1600}
+          draggable={false}
+          loading="lazy"
+          decoding="async"
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            cursor: "auto",
+          }}
+        />
+      );
+    }
+    
+    const m = productProcessedMedia[selectedImage] || productProcessedMedia[0];
+    if (!m) {
+      return null;
+    }
+    
     const fileId = m?.fileId;
     const url = fileId
       ? productService.getOptimizedImageUrl(fileId, 1600)
@@ -1062,7 +1095,7 @@ export default function ProductDetail() {
     if (isVideo) {
       return (
         <video
-          src={url}
+          src={url || UPLOADED_FALLBACK}
           controls
           autoPlay
           playsInline
@@ -1080,7 +1113,7 @@ export default function ProductDetail() {
     return (
       <img
         src={url || UPLOADED_FALLBACK}
-        alt={product?.name || "Product"}
+        alt={productName}
         width={1600}
         height={1600}
         draggable={false}
@@ -1094,7 +1127,7 @@ export default function ProductDetail() {
         }}
       />
     );
-  }, [product?.processedMedia, selectedImage, product?.name]);
+  }, [productProcessedMedia, selectedImage, productName]);
 
   return (
     <>
@@ -1103,7 +1136,7 @@ export default function ProductDetail() {
           {/* Gallery */}
           <div className="lg:w-1/2">
             <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
-              {isClient && product?.processedMedia && Array.isArray(product.processedMedia) && product.processedMedia.length > 0 ? (
+              {isClient && productProcessedMedia.length > 0 ? (
                 <>
                   {/* Prev / Next Buttons (overlay) */}
                   <button
@@ -1141,11 +1174,11 @@ export default function ProductDetail() {
                       playActiveSlideVideo(swiper);
                     }}
                   >
-                    {product.processedMedia.map((m, index) => (
+                    {productProcessedMedia.map((m, index) => (
                       <SwiperSlide key={m?.fileId || m?.view || index}>
                         <MediaSlide
                           media={m || {}}
-                          name={product?.name || "Product"}
+                          name={productName}
                           isActive={selectedImage === index}
                           onOpenZoom={() => openZoom()}
                         />
@@ -1154,14 +1187,14 @@ export default function ProductDetail() {
                   </Swiper>
 
                   <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs shadow-sm">
-                    {selectedImage + 1} / {product?.processedMedia?.length || 1}
+                    {selectedImage + 1} / {productProcessedMedia.length || 1}
                   </div>
                 </>
               ) : (
                 <div className="h-full w-full flex items-center justify-center">
                   <img
                     src={"/placeholder-product.jpg"}
-                    alt={product?.name || "Product"}
+                    alt={productName}
                     width={1600}
                     height={1600}
                     className="w-full h-full object-cover"
@@ -1173,10 +1206,10 @@ export default function ProductDetail() {
             </div>
 
             {/* Thumbnails */}
-            {product.processedMedia && product.processedMedia.length > 1 && (
+            {productProcessedMedia.length > 1 && (
               <div className="mt-4 flex items-center gap-2">
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                  {product.processedMedia.map((m, idx) => {
+                  {productProcessedMedia.map((m, idx) => {
                     if (!m) return null;
                     const isActive = selectedImage === idx;
                     return (

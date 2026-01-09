@@ -171,25 +171,31 @@ function getCardPricing(product) {
 }
 
 const ProductCard = ({ product }) => {
+  // ALL HOOKS MUST BE AT TOP LEVEL - NEVER CONDITIONAL
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const fallbackImg = "/assets/no-image.png";
 
-  if (!product || (!product.id && !product.$id)) {
-    return null;
-  }
-
-  const productId = product?.id || product?.$id || "";
+  // Safe defaults for product data
+  const safeProduct = product || {};
+  const productId = safeProduct?.id || safeProduct?.$id || "";
+  const productName = safeProduct?.name || "Untitled Product";
+  const productImages = Array.isArray(safeProduct?.images) ? safeProduct.images : [];
+  const productPrice = safeProduct?.price ?? null;
+  const productSlug = safeProduct?.slug || safeProduct?.$id || "";
+  const productDescription = safeProduct?.description || "";
+  const productStock = safeProduct?.stock ?? null;
+  const productBrand = safeProduct?.brand || "";
 
   // Safely extract first fileId (string or {$id})
   const fileId = useMemo(() => {
-    if (!product?.images || product.images.length === 0) return null;
-    const first = product.images[0];
+    if (!productImages || productImages.length === 0) return null;
+    const first = productImages[0];
     if (typeof first === "string") return first;
     if (first && typeof first === "object" && first.$id) return first.$id;
     return null;
-  }, [product]);
+  }, [productImages]);
 
   // Optimized image URL for mobile performance
   const previewUrl = useMemo(() => {
@@ -203,16 +209,29 @@ const ProductCard = ({ product }) => {
   }, [fileId]);
 
   const { price, compareAt, usedVariations, hasMultiple } = useMemo(
-    () => getCardPricing(product),
-    [product]
+    () => getCardPricing(safeProduct),
+    [safeProduct]
   );
 
   const imageSrc = !imgError && previewUrl ? previewUrl : fallbackImg;
   const hasNumericPrice = typeof price === "number";
+  
+  // Render fallback UI for invalid products instead of returning null (prevents hydration mismatch)
+  const isValidProduct = productId && (safeProduct?.id || safeProduct?.$id);
+
+  if (!isValidProduct) {
+    return (
+      <div className="rounded-lg overflow-hidden shadow-sm bg-gray-100 aspect-[2/3] flex items-center justify-center">
+        <div className="text-center p-4">
+          <p className="text-xs text-gray-500">Product unavailable</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      onClick={() => navigate(`/product/${productId}`)}
+      onClick={() => productId && navigate(`/product/${productId}`)}
       className="cursor-pointer group rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
     >
       <Link to={`/product/${productId}`} className="block w-full h-full">
@@ -224,7 +243,7 @@ const ProductCard = ({ product }) => {
 
           <img
             src={imageSrc || fallbackImg}
-            alt={product?.name || "Product image"}
+            alt={productName}
             width={600}
             height={900}
             className={`h-full w-full object-cover transition-opacity duration-300 ${
@@ -256,7 +275,7 @@ const ProductCard = ({ product }) => {
         {/* Info */}
         <div className="p-3 text-center space-y-1">
           <p className="text-sm font-medium text-neutral-900 line-clamp-1">
-            {product?.name || "Untitled Product"}
+            {productName}
           </p>
 
           <div className="flex justify-center items-center gap-2 text-sm">
