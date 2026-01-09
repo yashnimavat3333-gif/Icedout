@@ -74,10 +74,18 @@ const getActiveVariation = (p, idx) => {
 
 // Detect media type from fileId or URL
 const detectMediaType = (fileId, viewUrl) => {
+  // Check fileId for video extension
   const fileIdStr = String(fileId || "").toLowerCase();
-  if (fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$)/i)) return "video";
+  if (fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i)) return "video";
+  
+  // Check viewUrl for video extension (handles URLs with query params)
   const urlStr = String(viewUrl || "").toLowerCase();
-  if (urlStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$)/i)) return "video";
+  // Match video extensions before query string, hash, or end of string
+  if (urlStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i)) return "video";
+  
+  // Also check if URL contains video-related paths
+  if (urlStr.includes("/video/") || urlStr.includes("/videos/")) return "video";
+  
   return "image";
 };
 
@@ -211,11 +219,15 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
   const isVideo = mediaType === "video";
 
   useEffect(() => {
-    if (!isVideo || !videoRef.current || !isActive) return;
+    if (!isVideo || !videoRef.current) return;
     const video = videoRef.current;
-    video.play().catch(() => {
-      setError(true);
-    });
+    if (isActive) {
+      video.play().catch(() => {
+        setError(true);
+      });
+    } else {
+      video.pause();
+    }
     return () => {
       if (video) {
         video.pause();
@@ -223,19 +235,22 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
     };
   }, [isVideo, isActive]);
 
-  const handleOpen = () => {
-    if (!isVideo) {
+  const handleClick = (e) => {
+    if (isVideo) {
+      // Videos: just ensure they play, no zoom
+      e.stopPropagation();
+      if (videoRef.current) {
+        videoRef.current.play().catch(() => {});
+      }
+    } else {
+      // Images: open zoom modal
       onOpenZoom?.();
     }
   };
 
   if (!media?.view || error) {
     return (
-      <div
-        className="h-full w-full flex items-center justify-center p-0 cursor-zoom-in"
-        onDoubleClick={handleOpen}
-        onClick={handleOpen}
-      >
+      <div className="h-full w-full flex items-center justify-center p-0">
         <img
           src={placeholder}
           alt="No media"
@@ -255,8 +270,8 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
       className={`h-full w-full flex items-center justify-center p-0 ${
         isVideo ? "cursor-default" : "cursor-zoom-in"
       } relative`}
-      onDoubleClick={handleOpen}
-      onClick={handleOpen}
+      onDoubleClick={handleClick}
+      onClick={handleClick}
     >
       {isVideo ? (
         <video
@@ -271,7 +286,7 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
             setError(true);
             setLoaded(false);
           }}
-          muted
+          muted={!isActive}
           playsInline
           autoPlay={isActive}
           loop
@@ -365,7 +380,25 @@ export default function ProductDetail() {
         const images = Array.isArray(doc.images) ? doc.images : [];
         const processedMedia = images.map((fileId) => {
           try {
-            const view = productService.getOptimizedImageUrl(fileId, 1600);
+            // Detect video type before URL generation
+            const fileIdStr = String(fileId || "").toLowerCase();
+            const isVideoFile = fileIdStr.match(/\.(mp4|webm|ogg|mov|avi)(\?|$|#)/i);
+            
+            // Generate URL - videos might need direct file view, images use optimized
+            let view;
+            try {
+              if (isVideoFile) {
+                // Try direct file view first for videos
+                view = productService.getFileView(fileId) || productService.getFilePreview(fileId) || productService.getOptimizedImageUrl(fileId, 1600);
+              } else {
+                // Images use optimized URL
+                view = productService.getOptimizedImageUrl(fileId, 1600);
+              }
+            } catch {
+              // Fallback to optimized URL for both
+              view = productService.getOptimizedImageUrl(fileId, 1600);
+            }
+            
             const norm = (u) =>
               typeof u === "string" ? u : u?.href || u?.toString() || "";
             const viewUrl = norm(view);
@@ -694,6 +727,12 @@ export default function ProductDetail() {
                     if (!m) return null;
                     const isActive = selectedImage === idx;
                     const isVideo = m?.type === "video";
+                    // For video thumbnails, use the view URL directly; for images, use optimized thumbnail
+                    const thumbSrc = isVideo
+                      ? (m?.view || "")
+                      : (m?.fileId
+                          ? productService.getOptimizedThumbnailUrl(m.fileId, 160)
+                          : m?.view || "");
                     return (
                       <button
                         key={m?.fileId || m?.view || String(idx)}
@@ -703,19 +742,12 @@ export default function ProductDetail() {
                             ? "border-gray-900"
                             : "border-transparent hover:border-gray-300"
                         }`}
-                        title={`thumb-${idx}`}
+                        title={isVideo ? `Video ${idx + 1}` : `Image ${idx + 1}`}
                         aria-label={`Thumbnail ${idx + 1}`}
                       >
                         <ThumbMedia
-                          src={
-                            m?.fileId
-                              ? productService.getOptimizedThumbnailUrl(
-                                  m.fileId,
-                                  160
-                                )
-                              : m?.view || ""
-                          }
-                          alt={`thumb-${idx}`}
+                          src={thumbSrc}
+                          alt={isVideo ? `Video thumbnail ${idx + 1}` : `Image thumbnail ${idx + 1}`}
                           isVideo={isVideo}
                         />
                       </button>
