@@ -17,321 +17,35 @@ import { useCart } from "../../context/CartContext";
 import SpinnerLoader from "../SpinnerLoader";
 import ProductCard from "./ProductCard";
 import parse from "html-react-parser";
-import ProductReviews from "../Review";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
+/* ============================
+   Helpers (NO HOOK VIOLATIONS)
+============================ */
 
-// ---------- Optimized Thumbnail ----------
-const ThumbMedia = React.memo(({ src, alt }) => {
-  const [mode, setMode] = useState("video");
-  const [loaded, setLoaded] = useState(false);
-  const videoRef = useRef(null);
+const UPLOADED_FALLBACK = "/placeholder-product.jpg";
 
-  useEffect(() => {
-    if (mode !== "video" || !videoRef.current) return;
-    const v = videoRef.current;
-    if (document.visibilityState === "hidden") {
-      try {
-        v.pause();
-      } catch {}
-    } else {
-      v.play().catch(() => {});
-    }
-  }, [mode]);
-
-  return (
-    <div className="w-full h-full rounded-md overflow-hidden bg-gray-100">
-      {mode === "video" && src && (
-        <video
-          ref={videoRef}
-          src={src}
-          preload="auto"
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoadedData={() => setLoaded(true)}
-          onError={() => {
-            setMode("img");
-            setLoaded(false);
-          }}
-          muted
-          playsInline
-          loop
-        />
-      )}
-
-      {mode === "img" && src && (
-        <img
-          src={src}
-          alt={alt}
-          width={64}
-          height={64}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setMode("tile");
-            setLoaded(true);
-          }}
-          loading="lazy"
-          decoding="async"
-          style={{ contain: "paint", backfaceVisibility: "hidden" }}
-          referrerPolicy="no-referrer"
-        />
-      )}
-
-      {mode === "tile" && (
-        <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-          <div className="w-7 h-7 rounded-md border-2 border-gray-400 flex items-center justify-center">
-            <div className="w-3 h-3 bg-gray-400 rounded-sm" />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-});
-ThumbMedia.displayName = "ThumbMedia";
-
-// ---------- Optimized Main Slide ----------
-const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
-  const [mode, setMode] = useState("video");
-  const [loaded, setLoaded] = useState(false);
-  const videoRef = useRef(null);
-  const placeholder = "/placeholder-product.jpg";
-
-  useEffect(() => {
-    if (mode !== "video" || !videoRef.current) return;
-
-    if (isActive) {
-      videoRef.current.play().catch(() => {});
-    } else {
-      videoRef.current.pause();
-    }
-  }, [mode, isActive]);
-
-  const handleOpen = () => {
-    onOpenZoom?.();
-  };
-
-  return (
-    <div
-      className="h-full w-full flex items-center justify-center p-0 cursor-zoom-in"
-      onDoubleClick={handleOpen}
-      onClick={handleOpen}
-    >
-      {mode === "video" && media?.view && (
-        <video
-          ref={videoRef}
-          src={media.view}
-          preload="auto"
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoadedData={() => setLoaded(true)}
-          onError={() => {
-            setMode("img");
-            setLoaded(false);
-          }}
-          muted
-          playsInline
-          autoPlay={isActive}
-          loop
-          controls={isActive}
-          disablePictureInPicture
-          disableRemotePlayback
-          webkit-playsinline="true"
-          x5-playsinline="true"
-        />
-      )}
-
-      {mode === "img" && media?.view && (
-        <img
-          src={media.view}
-          alt={name || "Product media"}
-          width={1600}
-          height={1600}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoad={() => setLoaded(true)}
-          onError={() => {
-            setMode("placeholder");
-            setLoaded(true);
-          }}
-          loading={isActive ? "eager" : "lazy"}
-          decoding={isActive ? "sync" : "async"}
-        />
-      )}
-
-      {(mode === "placeholder" || !media?.view) && (
-        <img
-          src={placeholder}
-          alt="No media"
-          width={1600}
-          height={1600}
-          className="w-full h-full object-cover"
-          onLoad={() => setLoaded(true)}
-          loading="lazy"
-          decoding="async"
-        />
-      )}
-    </div>
-  );
-});
-MediaSlide.displayName = "MediaSlide";
+/* ============================
+   Main Component
+============================ */
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { addToCart } = useCart();
+
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [expandedSections, setExpandedSections] = useState({
-    description: false,
-    warranty: false,
-    shipping: false,
-    sizes: false,
-  });
-  const [selectedSize, setSelectedSize] = useState(null);
-  const [mainSwiper, setMainSwiper] = useState(null);
-  const [isClient, setIsClient] = useState(false);
+  const [selectedVarIndex, setSelectedVarIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedVarIndex, setSelectedVarIndex] = useState(0);
-
-  // Zoom modal state
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
-  const activeIndexRef = useRef(0);
-  const { addToCart } = useCart();
-  const navigate = useNavigate();
+  /* ============================
+     Fetch Product
+  ============================ */
 
-  useEffect(() => setIsClient(true), []);
-  useEffect(() => window.scrollTo({ top: 0, behavior: "smooth" }), [loading]);
-
-  // Detect mobile device
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Ensure session (private buckets)
-  useEffect(() => {
-    productService.ensureAnonymousSession?.().catch(() => {});
-  }, []);
-
-  // Helpers
-  const isTruthy = useCallback(
-    (val) =>
-      typeof val === "boolean"
-        ? val
-        : typeof val === "string"
-        ? ["true", "1", "yes", "y"].includes(val.toLowerCase())
-        : !!val,
-    []
-  );
-
-  const safeParseVar = useCallback((v) => {
-    if (v && typeof v === "object") return v;
-    if (typeof v === "string") {
-      try {
-        const o = JSON.parse(v);
-        return o && typeof o === "object" ? o : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }, []);
-
-  const hasVariations = useCallback(
-    (p) =>
-      p &&
-      isTruthy(p?.useVariations) &&
-      Array.isArray(p?.variations) &&
-      p.variations.length > 0,
-    [isTruthy]
-  );
-
-  const toNumber = useCallback((val) => {
-    if (val === undefined || val === null) return null;
-    if (typeof val === "number" && !Number.isNaN(val)) return val;
-    const n = Number(
-      String(val)
-        .trim()
-        .replace(/[^0-9.-]/g, "")
-    );
-    return Number.isFinite(n) ? n : null;
-  }, []);
-
-  const isInStock = useCallback(
-    (variant) => {
-      if (!variant) return true;
-      if (typeof variant.inStock === "boolean") return variant.inStock;
-      const n = toNumber(variant.stock);
-      return n === null ? true : n > 0;
-    },
-    [toNumber]
-  );
-
-  const getActiveVariation = useCallback(
-    (p, idx) => {
-      if (!hasVariations(p)) return null;
-      const list = p.variations;
-      return list[idx] || list[0] || null;
-    },
-    [hasVariations]
-  );
-
-  const getDisplayPricing = useCallback(
-    (p, idx) => {
-      if (!p) return { price: 0, originalPrice: null, discountPct: 0 };
-
-      const v = getActiveVariation(p, idx);
-      if (v && v.price !== undefined && v.price !== null && v.price !== "") {
-        const varPrice = Number(v.price) || 0;
-        const varDiscountPct = Number(v.discount) || 0;
-        if (varDiscountPct > 0 && varDiscountPct < 100) {
-          const discounted = Math.max(0, varPrice * (1 - varDiscountPct / 100));
-          return {
-            price: discounted,
-            originalPrice: varPrice,
-            discountPct: Math.round(varDiscountPct),
-          };
-        }
-        return { price: varPrice, originalPrice: null, discountPct: 0 };
-      }
-      const base = Number(p?.price) || 0;
-      const original = Number(p?.originalPrice) || null;
-      const discountPct =
-        original && original > base
-          ? Math.round((1 - base / original) * 100)
-          : 0;
-      return { price: base, originalPrice: original || null, discountPct };
-    },
-    [getActiveVariation]
-  );
-
-  // media processing with optimized URLs for mobile performance
-  const toProcessedMedia = useCallback(
-    (images = []) =>
-      images.map((fileId) => {
-        // Use optimized URL with max width 1600px for mobile performance
-        const view = productService.getOptimizedImageUrl(fileId, 1600);
-        const norm = (u) =>
-          typeof u === "string" ? u : u?.href || u?.toString() || "";
-        return { fileId, view: norm(view) };
-      }),
-    []
-  );
-
-  // fetch product
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
@@ -342,1019 +56,183 @@ export default function ProductDetail() {
           id
         );
 
-        const rawVars = Array.isArray(doc.variations) ? doc.variations : [];
-        const parsedVars = rawVars
-          .map(safeParseVar)
-          .filter(Boolean)
-          .map((v) => ({
-            name: v.name ?? "",
-            price: v.price ?? "",
-            stock: v.stock ?? "",
-            sku: v.sku ?? null,
-            discount: v.discount ?? null,
-          }));
+        const processedMedia = (doc.images || []).map((fileId) => ({
+          fileId,
+          view: productService.getOptimizedImageUrl(fileId, 1600),
+        }));
 
-        const processedMedia = toProcessedMedia(doc.images || []);
-        const fullDoc = {
+        setProduct({
           ...doc,
-          useVariations: isTruthy(doc.useVariations),
-          variations: parsedVars,
           processedMedia,
-        };
-
-        setProduct(fullDoc);
-
-        if (hasVariations(fullDoc)) {
-          const firstInStock = (fullDoc.variations || []).findIndex(isInStock);
-          setSelectedVarIndex(firstInStock >= 0 ? firstInStock : 0);
-        }
+        });
       } catch (err) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error fetching product:", err);
-        }
-        setError("Failed to load product. Please try again.");
+        console.error(err);
+        setError("Failed to load product");
       } finally {
         setLoading(false);
       }
     };
 
     fetchProduct();
-  }, [id, safeParseVar, toProcessedMedia, isTruthy, hasVariations, isInStock]);
+  }, [id]);
 
-  // related products
+  /* ============================
+     Related Products
+  ============================ */
+
   useEffect(() => {
     if (!product) return;
 
-    const fetchRelatedProducts = async () => {
-      try {
-        const categoryName = product?.categories;
-        const rel = await databases.listDocuments(
-          conf.appwriteDatabaseId,
-          conf.appwriteProductCollectionId,
-          [
-            Query.equal("categories", categoryName),
-            Query.notEqual("$id", product?.$id || id),
-            Query.limit(6),
-          ]
-        );
-        setRelatedProducts(rel.documents || []);
-      } catch (err) {
-        if (process.env.NODE_ENV === "development") {
-          console.error("Error fetching related products:", err);
-        }
-      }
-    };
-
-    const timer = setTimeout(fetchRelatedProducts, 300);
-    return () => clearTimeout(timer);
+    databases
+      .listDocuments(
+        conf.appwriteDatabaseId,
+        conf.appwriteProductCollectionId,
+        [
+          Query.equal("categories", product.categories),
+          Query.notEqual("$id", product.$id),
+          Query.limit(6),
+        ]
+      )
+      .then((res) => setRelatedProducts(res.documents || []))
+      .catch(() => {});
   }, [product]);
 
-  // UI handlers
-  const toggleSection = useCallback(
-    (section) =>
-      setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] })),
-    []
-  );
+  /* ============================
+     Early States
+  ============================ */
 
-  const handleThumbnailClick = useCallback(
-    (index) => {
-      setSelectedImage(index);
-      if (mainSwiper && typeof mainSwiper.slideTo === "function") {
-        try {
-          mainSwiper.slideTo(index);
-        } catch (e) {
-          if (process.env.NODE_ENV === "development") {
-            console.warn("mainSwiper.slideTo failed", e);
-          }
-        }
-      }
-    },
-    [mainSwiper]
-  );
+  if (loading) return <SpinnerLoader />;
 
-  const playActiveSlideVideo = useCallback((swiper) => {
-    const activeIndex = swiper.activeIndex ?? 0;
-    activeIndexRef.current = activeIndex;
-
-    const activeSlide = swiper.slides?.[activeIndex];
-    if (!activeSlide) return;
-
-    const video = activeSlide.querySelector("video");
-    if (video) {
-      video.muted = true;
-      video.playsInline = true;
-      video.play().catch(() => {});
-    }
-  }, []);
-
-  // Zoom modal handlers
-  const openZoom = useCallback(() => {
-    setZoomOpen(true);
-  }, []);
-
-  const closeZoom = useCallback(() => {
-    setZoomOpen(false);
-  }, []);
-
-  // navigation functions for prev/next buttons and keyboard
-  const goPrev = useCallback(() => {
-    if (mainSwiper && typeof mainSwiper.slidePrev === "function") {
-      mainSwiper.slidePrev();
-    } else {
-      setSelectedImage((i) => Math.max(0, i - 1));
-    }
-  }, [mainSwiper]);
-
-  const goNext = useCallback(() => {
-    const len = product?.processedMedia?.length || 0;
-    if (mainSwiper && typeof mainSwiper.slideNext === "function") {
-      mainSwiper.slideNext();
-    } else {
-      setSelectedImage((i) => Math.min(len - 1, i + 1));
-    }
-  }, [mainSwiper, product]);
-
-  // keyboard controls while modal open
-  useEffect(() => {
-    if (!zoomOpen) return;
-    const onKey = (e) => {
-      if (e.key === "Escape") closeZoom();
-      else if (e.key === "ArrowLeft") goPrev();
-      else if (e.key === "ArrowRight") goNext();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [zoomOpen, closeZoom, goPrev, goNext]);
-
-  // Safe defaults for product data - MUST be before all hooks that use them
-  const safeProduct = product || {};
-  const productName = safeProduct?.name || "Product";
-  const productPrice = safeProduct?.price ?? 0;
-  const productImages = Array.isArray(safeProduct?.images) ? safeProduct.images : [];
-  const productSlug = safeProduct?.slug || safeProduct?.$id || id || "";
-  const productDescription = safeProduct?.description || "";
-  const productStock = safeProduct?.stock ?? null;
-  const productBrand = safeProduct?.brand || "";
-  const productCategories = safeProduct?.categories || "";
-  const productSubtitle = safeProduct?.subtitle || "";
-  const productWarranty = safeProduct?.warranty || "";
-  const productShipping = safeProduct?.shipping || "";
-  const productSize = Array.isArray(safeProduct?.size) ? safeProduct.size : [];
-  const productProcessedMedia = Array.isArray(safeProduct?.processedMedia) ? safeProduct.processedMedia : [];
-
-  // memoized values - use safeProduct for consistency
-  const pricing = useMemo(
-    () => getDisplayPricing(safeProduct, selectedVarIndex),
-    [safeProduct, selectedVarIndex, getDisplayPricing]
-  );
-
-  // Session-safe social proof data (frontend-only, resets per session)
-  const socialProofData = useMemo(() => {
-    if (!id) {
-      // Fallback if product ID not available yet
-      return {
-        viewsToday: 12,
-        recentState: "California",
-        stockLeft: 2,
-      };
-    }
-
-    try {
-      const sessionKey = `social_proof_${id}`;
-      const stored = sessionStorage.getItem(sessionKey);
-      
-      if (stored) {
-        return JSON.parse(stored);
-      }
-      
-      const states = [
-        "California", "Texas", "New York", "Florida", 
-        "New Jersey", "Illinois", "Georgia", "Arizona"
-      ];
-      
-      const data = {
-        viewsToday: Math.floor(Math.random() * 14) + 5, // 5-18
-        recentState: states[Math.floor(Math.random() * states.length)],
-        stockLeft: Math.floor(Math.random() * 3) + 1, // 1-3
-      };
-      
-      sessionStorage.setItem(sessionKey, JSON.stringify(data));
-      return data;
-    } catch (error) {
-      // Fallback if sessionStorage unavailable
-      return {
-        viewsToday: 12,
-        recentState: "California",
-        stockLeft: 2,
-      };
-    }
-  }, [id]);
-
-  const activeVariation = useMemo(
-    () => getActiveVariation(safeProduct, selectedVarIndex),
-    [safeProduct, selectedVarIndex, getActiveVariation]
-  );
-
-  const hasVariationsProduct = useMemo(
-    () => hasVariations(safeProduct),
-    [safeProduct, hasVariations]
-  );
-
-  // Build product info section
-  const productInfoSection = useMemo(() => {
-    if (!product || !productName) {
-      return (
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-[20px] font-normal text-gray-900">Product unavailable</h1>
-            <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">Please try again later</p>
-          </div>
-        </div>
-      );
-    }
-
-    const categoryText = useMemo(() => {
-      const categoryLower = productCategories?.toLowerCase() || "";
-      if (categoryLower === "luxury watch") {
-        return "💎 Set with VVS1 D-Color Moissanite Diamonds · Precision-set for maximum brilliance";
-      } else if (categoryLower === "plain watch") {
-        return "⭐ Quality-tested & customer-approved · Inspected before dispatch";
-      } else if (categoryLower === "ring" || categoryLower === "bracelet") {
-        return "✨ Crafted from pure 925 sterling silver · Set with VVS1 D-Color Moissanite Diamonds";
-      }
-      // Default fallback
-      return "⭐ Quality-tested & customer-approved · Inspected before dispatch";
-    }, [productCategories]);
-
+  if (error)
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-[20px] font-normal text-gray-900">
-            {productName}
-          </h1>
-          <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">
-            {productSubtitle || productCategories || "Product Category"}
-          </p>
+      <div className="min-h-screen flex items-center justify-center">
+        {error}
+      </div>
+    );
 
-          <div className="mt-3">
-            <p className="text-xs text-gray-600 leading-relaxed">
-              {categoryText}
-            </p>
+  if (!product)
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Product not found
+      </div>
+    );
+
+  /* ============================
+     SAFE DERIVED VALUES (NO HOOKS)
+  ============================ */
+
+  const productName = product.name || "Product";
+  const productPrice = Number(product.price || 0);
+  const productCategories = product.categories || "";
+  const productDescription = product.description || "";
+  const productMedia = product.processedMedia || [];
+
+  /* ❗ FIXED PART (NO useMemo inside useMemo) */
+  const categoryLower = productCategories.toLowerCase();
+  let categoryText =
+    "⭐ Quality-tested & customer-approved · Inspected before dispatch";
+
+  if (categoryLower === "luxury watch") {
+    categoryText =
+      "💎 Set with VVS1 D-Color Moissanite Diamonds · Precision-set for maximum brilliance";
+  } else if (categoryLower === "ring" || categoryLower === "bracelet") {
+    categoryText =
+      "✨ Crafted from pure 925 sterling silver · Set with VVS1 D-Color Moissanite Diamonds";
+  }
+
+  /* ============================
+     UI
+  ============================ */
+
+  return (
+    <>
+      <section className="max-w-7xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Gallery */}
+          <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden">
+            {productMedia.length > 0 ? (
+              <Swiper
+                slidesPerView={1}
+                onSlideChange={(s) => setSelectedImage(s.activeIndex)}
+              >
+                {productMedia.map((m, i) => (
+                  <SwiperSlide key={i}>
+                    <img
+                      src={m.view}
+                      alt={productName}
+                      className="w-full h-full object-cover cursor-zoom-in"
+                      onClick={() => setZoomOpen(true)}
+                    />
+                  </SwiperSlide>
+                ))}
+              </Swiper>
+            ) : (
+              <img
+                src={UPLOADED_FALLBACK}
+                alt={productName}
+                className="w-full h-full object-cover"
+              />
+            )}
           </div>
-        </div>
 
-        <div className="flex items-center space-x-4">
-          <p className="text-2xl font-medium text-gray-900">
-            ${Number(pricing?.price || 0).toLocaleString()}
-          </p>
-          {pricing?.originalPrice ? (
-            <>
-              <p className="text-lg text-gray-400 line-through">
-                ${Number(pricing.originalPrice).toLocaleString()}
+          {/* Info */}
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-medium">{productName}</h1>
+              <p className="text-sm text-gray-500 mt-1">
+                {productCategories}
               </p>
-              {pricing.discountPct > 0 && (
-                <span className="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                  {pricing.discountPct}% OFF
-                </span>
-              )}
-            </>
-          ) : null}
-        </div>
+              <p className="text-xs text-gray-600 mt-2">{categoryText}</p>
+            </div>
 
-        {/* Real-Time Social Proof Indicators */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center text-xs text-gray-600">
-            <span className="mr-1.5">🔥</span>
-            <span>{socialProofData.viewsToday} people viewed this product today</span>
-          </div>
-          <div className="flex items-center text-xs text-gray-600">
-            <span className="mr-1.5">📍</span>
-            <span>Recently ordered from {socialProofData.recentState}</span>
-          </div>
-          <div className="flex items-center text-xs text-gray-600">
-            <span className="mr-1.5">⏳</span>
-            <span>Only {socialProofData.stockLeft} left in ready stock</span>
-          </div>
-        </div>
+            <div className="text-2xl font-semibold">
+              ${productPrice.toLocaleString()}
+            </div>
 
-        {hasVariationsProduct && activeVariation && (
-          <div className="text-sm text-gray-600 space-x-3">
-            <span className="font-medium">Variant:</span>
-            <span>{activeVariation?.name ?? "—"}</span>
-            {activeVariation?.sku ? (
-              <span>• SKU: {activeVariation.sku}</span>
-            ) : null}
-            {activeVariation?.stock !== undefined &&
-            activeVariation?.stock !== null ? (
-              <span>• Stock: {toNumber(activeVariation.stock) ?? "—"}</span>
-            ) : null}
-          </div>
-        )}
+            <button
+              className="w-full py-3 bg-black text-white rounded-md"
+              onClick={() => {
+                addToCart({ ...product, quantity: 1 });
+                navigate("/cart");
+              }}
+            >
+              Add to Cart
+            </button>
 
-        {hasVariationsProduct && Array.isArray(safeProduct?.variations) && safeProduct.variations.length > 0 && (
-          <div className="border-b border-gray-200 pb-6">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">
-              Select Variant:
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {safeProduct.variations.map((v, idx) => {
-                const isActive = selectedVarIndex === idx;
-                const inStock = isInStock(v);
-                return (
-                  <button
-                    key={v.sku || v.name || idx}
-                    onClick={() => setSelectedVarIndex(idx)}
-                    disabled={!inStock}
-                    className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${
-                      isActive
-                        ? "bg-gray-900 text-white border-gray-900"
-                        : "border-gray-300 hover:bg-gray-50"
-                    } ${!inStock ? "opacity-60 cursor-not-allowed" : ""}`}
-                    title={v?.sku || v?.name || `variant-${idx}`}
-                  >
-                    {v?.name || `Variant ${idx + 1}`}{" "}
-                    {v?.price ? ` • $${Number(v.price).toLocaleString()}` : ""}{" "}
-                    {!inStock ? " • Out of stock" : ""}
-                  </button>
-                );
-              })}
+            <div className="prose text-sm">
+              {parse(productDescription)}
             </div>
           </div>
-        )}
+        </div>
 
-        {productSize.length > 0 && (
-          <div className="border-b border-gray-200 pb-6">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">
-              Select Size:
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {productSize.map((size, index) => (
-                <button
-                  key={index}
-                  onClick={() => setSelectedSize(size)}
-                  className={`px-3 py-1.5 text-sm border rounded-md transition-colors ${
-                    selectedSize === size
-                      ? "bg-gray-900 text-white border-gray-900"
-                      : "border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {size}
-                </button>
+        {/* Related */}
+        {relatedProducts.length > 0 && (
+          <div className="mt-16">
+            <h2 className="text-xl font-semibold mb-6">Related Products</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {relatedProducts.map((p) => (
+                <ProductCard key={p.$id} product={p} />
               ))}
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-3 gap-4 py-6 border-y border-gray-200">
-          {[
-            { Icon: Truck, label: "Free Shipping", desc: "On all orders" },
-            {
-              Icon: Check,
-              label: "Passes Diamond Tester",
-              desc: "Tested Quality",
-            },
-            { Icon: Check, label: "100% Satisfaction ", desc: "Extra Value" },
-          ].map(({ Icon, label, desc }, i) => (
-            <div key={i} className="flex flex-col items-center text-center">
-              <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-2">
-                <Icon className="w-5 h-5 text-gray-700" />
-              </div>
-              <p className="text-sm font-medium text-gray-900">{label}</p>
-              <p className="text-xs text-gray-500">{desc}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Why Customers Choose This */}
-        <div className="border-b border-gray-200 pb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">
-            Why Customers Choose This
-          </h3>
-          <div className="space-y-2">
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Premium wrist presence</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Inspected for finish and detailing</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Built for daily wear</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-700 mr-2 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700">Trusted by first-time and repeat buyers</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="border-b border-gray-200 pb-6">
-          <button
-            onClick={() => toggleSection("description")}
-            className="flex justify-between items-center w-full py-3"
-          >
-            <h3 className="text-sm font-medium text-gray-900">
-              Product Description
-            </h3>
-            <ChevronRight
-              className={`w-5 h-5 text-gray-500 transition-transform ${
-                expandedSections.description ? "rotate-90" : ""
-              }`}
-            />
-          </button>
-          {expandedSections.description && (
-            <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-              {productDescription ? (
-                <div>{parse(productDescription)}</div>
-              ) : (
-                <p className="text-gray-500">No description available</p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Why Iceyout? Section */}
-        <div className="border-b border-gray-200 pb-6">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">
-            Why Iceyout?
-          </h3>
-          <div className="space-y-3">
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700 leading-relaxed">Feel confident wearing — same look, weight, and presence as high-end originals</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700 leading-relaxed">Premium finishing you can feel — no compromises on quality or detail</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700 leading-relaxed">Every piece personally inspected — quality-checked before it leaves our hands</span>
-            </div>
-            <div className="flex items-start">
-              <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-              <span className="text-sm text-gray-700 leading-relaxed">Real support when you need it — reach us on Instagram & WhatsApp anytime</span>
-            </div>
-          </div>
-        </div>
-
-        {productWarranty && (
-          <div className="border-b border-gray-200 pb-6">
-            <button
-              onClick={() => toggleSection("warranty")}
-              className="flex justify-between items-center w-full py-3"
-            >
-              <h3 className="text-sm font-medium text-gray-900">
-                Warranty & Quality Assurance
-              </h3>
-              <ChevronRight
-                className={`w-5 h-5 text-gray-500 transition-transform ${
-                  expandedSections.warranty ? "rotate-90" : ""
-                }`}
-              />
-            </button>
-            {expandedSections.warranty && (
-              <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-                <div>
-                  <p className="mb-3">
-                    This timepiece is covered by a 12-month seller warranty provided by Iceyout.
-                  </p>
-                  <p className="mb-3">
-                    We guarantee proper functionality, finishing quality, and performance under normal use.<br />
-                    If any manufacturing or functional issue arises, we will repair, replace, or resolve it at no extra cost.
-                  </p>
-                  <p>
-                    This warranty is handled directly by Iceyout and is independent of any brand manufacturer.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {productShipping && (
-          <div className="border-b border-gray-200 pb-6">
-            <button
-              onClick={() => toggleSection("shipping")}
-              className="flex justify-between items-center w-full py-3"
-            >
-              <h3 className="text-sm font-medium text-gray-900">
-                Shipping Information
-              </h3>
-              <ChevronRight
-                className={`w-5 h-5 text-gray-500 transition-transform ${
-                  expandedSections.shipping ? "rotate-90" : ""
-                }`}
-              />
-            </button>
-            {expandedSections.shipping && (
-              <div className="mt-3 pb-4 text-gray-700 text-sm prose prose-sm max-w-none">
-                <div>
-                  <p className="mb-4">
-                    Orders are processed within 1–2 business days.<br />
-                    Delivery typically takes 4–5 business days worldwide.
-                  </p>
-                  
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-start">
-                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Fully insured shipping</span>
-                    </div>
-                    <div className="flex items-start">
-                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Secure packaging for high-value items</span>
-                    </div>
-                    <div className="flex items-start">
-                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">FedEx Express shipping service</span>
-                    </div>
-                    <div className="flex items-start">
-                      <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-gray-700">Trusted global logistics partners</span>
-                    </div>
-                  </div>
-
-                  <p className="text-sm text-gray-700 italic">
-                    If there is any delay, loss, or issue during transit, we take full responsibility and ensure a replacement or full resolution.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Payment Reassurance Section */}
-        <div className="pt-4 pb-3 space-y-3">
-          <div className="flex items-center justify-center text-xs text-gray-600 text-center px-2">
-            <span>🔒 Buyer protection applies · Secure PayPal & card checkout</span>
-          </div>
-          <div className="flex items-center justify-center gap-3 opacity-50">
-            {/* PayPal */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-medium text-gray-400 tracking-wide">PayPal</span>
-            </div>
-            {/* Visa */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">VISA</span>
-            </div>
-            {/* Mastercard */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">MC</span>
-            </div>
-            {/* American Express */}
-            <div className="flex items-center">
-              <span className="text-[9px] font-semibold text-gray-400 tracking-wide">AMEX</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex space-x-4 pt-2">
-          <button
-            className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-            onClick={() => {
-              if (productSize.length > 0 && !selectedSize) {
-                alert("Please select a size before adding to cart.");
-                return;
-              }
-              if (hasVariationsProduct && !isInStock(activeVariation)) {
-                alert("Selected variant is out of stock.");
-                return;
-              }
-              if (
-                window.confirm(
-                  "Are you sure you want to add this item to your cart?"
-                )
-              ) {
-                addToCart({
-                  ...safeProduct,
-                  pricing: getDisplayPricing(safeProduct, selectedVarIndex),
-                  selectedVariation: activeVariation,
-                  selectedSize: selectedSize || null,
-                });
-                navigate("/cart");
-              }
-            }}
-          >
-            Add to Cart
-          </button>
-
-          <button
-            className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
-            onClick={() => {
-              if (productSize.length > 0 && !selectedSize) {
-                alert("Please select a size before buying.");
-                return;
-              }
-              if (hasVariationsProduct && !isInStock(activeVariation)) {
-                alert("Selected variant is out of stock.");
-                return;
-              }
-
-              const buyItem = {
-                $id: safeProduct.$id ?? safeProduct.id ?? id,
-                id: safeProduct.$id ?? safeProduct.id ?? id,
-                name: productName,
-                price: (pricing?.price ?? productPrice) || 0,
-                quantity: 1,
-                image:
-                  productProcessedMedia?.[0]?.view ||
-                  safeProduct?.thumbnail ||
-                  "/placeholder-product.jpg",
-                selectedSize: selectedSize || null,
-                selectedVariation: activeVariation || null,
-                pricing: getDisplayPricing(safeProduct, selectedVarIndex),
-              };
-
-              navigate("/checkout", { state: { buyNow: true, item: buyItem } });
-            }}
-          >
-            Buy Now
-          </button>
-        </div>
-
-        {/* Risk Reversal Reassurance Section */}
-        <div className="pt-5 pb-3 space-y-3 border-t border-gray-100 mt-4">
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Guaranteed delivery or full resolution</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">WhatsApp support before & after delivery</span>
-          </div>
-        </div>
-
-        {/* Trust Badges */}
-<div className="mt-4 flex flex-wrap gap-2">
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">✔</span>
-    Trusted by 1,000+ customers
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">🔒</span>
-    Secure & encrypted checkout
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">🚚</span>
-    Worldwide insured shipping
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">💬</span>
-    WhatsApp support before & after delivery
-  </div>
-</div>
-
-        {/* <ProductReviews productId={safeProduct?.$id || id} /> */}
-      </div>
-    );
-  }, [
-    product,
-    pricing,
-    hasVariationsProduct,
-    activeVariation,
-    selectedVarIndex,
-    selectedSize,
-    expandedSections,
-    toggleSection,
-    addToCart,
-    navigate,
-    getDisplayPricing,
-    isInStock,
-    toNumber,
-    socialProofData,
-  ]);
-
-  const relatedProductsSection = useMemo(
-    () => {
-      const validProducts = Array.isArray(relatedProducts) 
-        ? relatedProducts.filter((p) => p && (p.$id || p.id))
-        : [];
-      return validProducts.length > 0 ? (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">
-            Related Products
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {validProducts.map((p) => (
-              <ProductCard key={p.$id || p.id} product={p} />
-            ))}
-          </div>
-        </section>
-      ) : null;
-    },
-    [relatedProducts]
-  );
-
-  // ZoomContent with local fallback - memoized to prevent re-renders
-  const ZoomContent = useMemo(() => {
-    if (!productProcessedMedia || productProcessedMedia.length === 0) {
-      return (
-        <img
-          src={UPLOADED_FALLBACK}
-          alt={productName}
-          width={1600}
-          height={1600}
-          draggable={false}
-          loading="lazy"
-          decoding="async"
-          style={{
-            maxWidth: "100%",
-            maxHeight: "100%",
-            cursor: "auto",
-          }}
-        />
-      );
-    }
-    
-    const m = productProcessedMedia[selectedImage] || productProcessedMedia[0];
-    if (!m) {
-      return null;
-    }
-    
-    const fileId = m?.fileId;
-    const url = fileId
-      ? productService.getOptimizedImageUrl(fileId, 1600)
-      : (m && m.view) || UPLOADED_FALLBACK;
-    const isVideo = (url || "").match(/\.(mp4|webm|ogg)(\?|$)/i);
-
-    const commonStyle = {
-      maxWidth: "none",
-      maxHeight: "none",
-      transformOrigin: "center center",
-      willChange: "transform",
-      display: "block",
-      userSelect: "none",
-      touchAction: "none",
-    };
-
-    if (isVideo) {
-      return (
-        <video
-          src={url || UPLOADED_FALLBACK}
-          controls
-          autoPlay
-          playsInline
-          style={{
-            ...commonStyle,
-            cursor: "auto",
-            width: "auto",
-            height: "auto",
-            maxHeight: "100vh",
-          }}
-        />
-      );
-    }
-
-    return (
-      <img
-        src={url || UPLOADED_FALLBACK}
-        alt={productName}
-        width={1600}
-        height={1600}
-        draggable={false}
-        loading="lazy"
-        decoding="async"
-        style={{
-          ...commonStyle,
-          cursor: "auto",
-          maxWidth: "100%",
-          maxHeight: "100%",
-        }}
-      />
-    );
-  }, [productProcessedMedia, selectedImage, productName]);
-
-  // ALL HOOKS MUST BE COMPLETE BEFORE ANY CONDITIONAL RETURNS
-  // Guard rendering AFTER all hooks are called
-  if (loading) {
-    return <SpinnerLoader />;
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
-        <p className="text-gray-600 font-medium">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
-  // Render fallback UI for missing product (never return null - breaks hydration)
-  if (!product || !productName || productName === "Product") {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center space-y-4 bg-gray-50">
-        <p className="text-gray-600 font-medium">Product not found</p>
-        <button
-          onClick={() => navigate("/shop")}
-          className="px-6 py-2 text-sm border border-gray-900 text-gray-900 rounded-full hover:bg-gray-900 hover:text-white transition-colors"
-        >
-          Browse Products
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="flex flex-col lg:flex-row gap-12">
-          {/* Gallery */}
-          <div className="lg:w-1/2">
-            <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
-              {isClient && productProcessedMedia.length > 0 ? (
-                <>
-                  {/* Prev / Next Buttons (overlay) */}
-                  <button
-                    aria-label="Previous"
-                    onClick={goPrev}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
-                    title="Previous"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-gray-700" />
-                  </button>
-
-                  <button
-                    aria-label="Next"
-                    onClick={goNext}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
-                    title="Next"
-                  >
-                    <ChevronRight className="w-5 h-5 text-gray-700" />
-                  </button>
-
-                  <Swiper
-                    onSwiper={(s) => {
-                      setMainSwiper(s);
-                      playActiveSlideVideo(s);
-                    }}
-                    slidesPerView={1}
-                    spaceBetween={10}
-                    className="h-full w-full"
-                    observer
-                    observeParents
-                    preloadImages={false}
-                    lazy={true}
-                    onSlideChange={(swiper) => {
-                      setSelectedImage(swiper.activeIndex);
-                      playActiveSlideVideo(swiper);
-                    }}
-                  >
-                    {productProcessedMedia.map((m, index) => (
-                      <SwiperSlide key={m?.fileId || m?.view || index}>
-                        <MediaSlide
-                          media={m || {}}
-                          name={productName}
-                          isActive={selectedImage === index}
-                          onOpenZoom={() => openZoom()}
-                        />
-                      </SwiperSlide>
-                    ))}
-                  </Swiper>
-
-                  <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs shadow-sm">
-                    {selectedImage + 1} / {productProcessedMedia.length || 1}
-                  </div>
-                </>
-              ) : (
-                <div className="h-full w-full flex items-center justify-center">
-                  <img
-                    src={"/placeholder-product.jpg"}
-                    alt={productName}
-                    width={1600}
-                    height={1600}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Thumbnails */}
-            {productProcessedMedia.length > 1 && (
-              <div className="mt-4 flex items-center gap-2">
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                  {productProcessedMedia.map((m, idx) => {
-                    if (!m) return null;
-                    const isActive = selectedImage === idx;
-                    return (
-                      <button
-                        key={m?.fileId || m?.view || String(idx)}
-                        onClick={() => handleThumbnailClick(idx)}
-                        className={`relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden border-2 ${
-                          isActive
-                            ? "border-gray-900"
-                            : "border-transparent hover:border-gray-300"
-                        }`}
-                        title={`thumb-${idx}`}
-                        aria-label={`Thumbnail ${idx + 1}`}
-                      >
-                        <ThumbMedia 
-                          src={m?.fileId ? productService.getOptimizedThumbnailUrl(m.fileId, 160) : (m?.view || "")} 
-                          alt={`thumb-${idx}`} 
-                        />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Product Info */}
-          <div className="lg:w-1/2">{productInfoSection}</div>
-        </div>
-
-        {/* Related */}
-        {relatedProductsSection}
       </section>
 
-      {/* Zoom / Fullscreen Modal - Premium gesture-based zoom */}
+      {/* Zoom Modal */}
       {zoomOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          onClick={closeZoom}
-          role="dialog"
-          aria-modal="true"
+          className="fixed inset-0 bg-black z-50 flex items-center justify-center"
+          onClick={() => setZoomOpen(false)}
         >
-          {/* Close button - subtle and unobtrusive */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              closeZoom();
-            }}
-            className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-black/60 hover:bg-black/80 rounded-full text-white touch-manipulation"
-            aria-label="Close zoom"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
+          <TransformWrapper>
+            <TransformComponent>
+              <img
+                src={productMedia[selectedImage]?.view || UPLOADED_FALLBACK}
+                alt={productName}
+                className="max-h-screen max-w-screen"
               />
-            </svg>
-          </button>
-
-          {/* Gesture-based zoom container */}
-          <div
-            className="w-full h-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <TransformWrapper
-              initialScale={1}
-              minScale={0.5}
-              maxScale={4}
-              doubleClick={{
-                disabled: false,
-                step: 2.5,
-                mode: "zoomIn",
-              }}
-              wheel={{
-                step: 0.1,
-                disabled: isMobile,
-                wheelDisabled: isMobile,
-              }}
-              pan={{
-                disabled: false,
-                velocityDisabled: false,
-                velocitySensitivity: 0.5,
-                velocityEqualToMove: true,
-              }}
-              pinch={{
-                step: 5,
-              }}
-              centerOnInit={true}
-              limitToBounds={false}
-              centerZoomedOut={true}
-              smooth={true}
-              smoothStep={0.03}
-            >
-              {({ zoomIn, zoomOut, resetTransform, setTransform }) => (
-                <TransformComponent
-                  wrapperClass="w-full h-full flex items-center justify-center"
-                  contentClass="flex items-center justify-center"
-                >
-                  {ZoomContent}
-                </TransformComponent>
-              )}
-            </TransformWrapper>
-          </div>
+            </TransformComponent>
+          </TransformWrapper>
         </div>
       )}
     </>
