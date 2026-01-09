@@ -546,7 +546,7 @@ export default function ProductDetail() {
 
   // Build product info section
   const productInfoSection = useMemo(() => {
-    if (!product) return null;
+    if (!product || !product.name) return null;
 
     const categoryText = useMemo(() => {
       const categoryLower = product?.categories?.toLowerCase() || "";
@@ -1075,7 +1075,7 @@ export default function ProductDetail() {
 
     return (
       <img
-        src={url}
+        src={url || UPLOADED_FALLBACK}
         alt={product?.name || "Product"}
         width={1600}
         height={1600}
@@ -1099,7 +1099,7 @@ export default function ProductDetail() {
           {/* Gallery */}
           <div className="lg:w-1/2">
             <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
-              {isClient && product.processedMedia ? (
+              {isClient && product?.processedMedia && Array.isArray(product.processedMedia) && product.processedMedia.length > 0 ? (
                 <>
                   {/* Prev / Next Buttons (overlay) */}
                   <button
@@ -1138,10 +1138,10 @@ export default function ProductDetail() {
                     }}
                   >
                     {product.processedMedia.map((m, index) => (
-                      <SwiperSlide key={m.fileId || m.view || index}>
+                      <SwiperSlide key={m?.fileId || m?.view || index}>
                         <MediaSlide
-                          media={m}
-                          name={product.name}
+                          media={m || {}}
+                          name={product?.name || "Product"}
                           isActive={selectedImage === index}
                           onOpenZoom={() => openZoom()}
                         />
@@ -1150,14 +1150,14 @@ export default function ProductDetail() {
                   </Swiper>
 
                   <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs shadow-sm">
-                    {selectedImage + 1} / {product.processedMedia.length}
+                    {selectedImage + 1} / {product?.processedMedia?.length || 1}
                   </div>
                 </>
               ) : (
                 <div className="h-full w-full flex items-center justify-center">
                   <img
                     src={"/placeholder-product.jpg"}
-                    alt={product.name || "Product"}
+                    alt={product?.name || "Product"}
                     width={1600}
                     height={1600}
                     className="w-full h-full object-cover"
@@ -1173,10 +1173,11 @@ export default function ProductDetail() {
               <div className="mt-4 flex items-center gap-2">
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
                   {product.processedMedia.map((m, idx) => {
+                    if (!m) return null;
                     const isActive = selectedImage === idx;
                     return (
                       <button
-                        key={m.fileId || m.view || String(idx)}
+                        key={m?.fileId || m?.view || String(idx)}
                         onClick={() => handleThumbnailClick(idx)}
                         className={`relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden border-2 ${
                           isActive
@@ -1187,7 +1188,7 @@ export default function ProductDetail() {
                         aria-label={`Thumbnail ${idx + 1}`}
                       >
                         <ThumbMedia 
-                          src={m.fileId ? productService.getOptimizedThumbnailUrl(m.fileId, 160) : m.view} 
+                          src={m?.fileId ? productService.getOptimizedThumbnailUrl(m.fileId, 160) : (m?.view || "")} 
                           alt={`thumb-${idx}`} 
                         />
                       </button>

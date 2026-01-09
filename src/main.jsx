@@ -8,6 +8,7 @@ import { RouterProvider, createBrowserRouter } from "react-router-dom";
 import { CartProvider } from "./context/CartContext.jsx";
 import { AuthLayout, Login } from "./components/index.js";
 import SpinnerLoader from "./components/SpinnerLoader.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { loadGtag } from "./lib/analytics.js";
 
 // Microsoft Clarity initialization with safe window check
@@ -257,10 +258,12 @@ loadGtag();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <CartProvider>
-        <RouterProvider router={router} />
-      </CartProvider>
-    </Provider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <CartProvider>
+          <RouterProvider router={router} />
+        </CartProvider>
+      </Provider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

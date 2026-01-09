@@ -176,6 +176,10 @@ const ProductCard = ({ product }) => {
   const navigate = useNavigate();
   const fallbackImg = "/assets/no-image.png";
 
+  if (!product || (!product.id && !product.$id)) {
+    return null;
+  }
+
   const productId = product?.id || product?.$id || "";
 
   // Safely extract first fileId (string or {$id})
@@ -219,7 +223,7 @@ const ProductCard = ({ product }) => {
           )}
 
           <img
-            src={imageSrc}
+            src={imageSrc || fallbackImg}
             alt={product?.name || "Product image"}
             width={600}
             height={900}
@@ -252,7 +256,7 @@ const ProductCard = ({ product }) => {
         {/* Info */}
         <div className="p-3 text-center space-y-1">
           <p className="text-sm font-medium text-neutral-900 line-clamp-1">
-            {product?.name || "Untitled"}
+            {product?.name || "Untitled Product"}
           </p>
 
           <div className="flex justify-center items-center gap-2 text-sm">
