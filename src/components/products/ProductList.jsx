@@ -1,5 +1,5 @@
 // src/components/ProductList.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, startTransition } from "react";
 import ProductCard from "./ProductCard";
 import productService from "../../appwrite/config";
 
@@ -66,7 +66,7 @@ export default function ProductList() {
   /* -------------------- server load - FIXED -------------------- */
   const fetchServerPage = useCallback(async (cursor) => {
     try {
-      console.log("📡 Fetching products from server...");
+      // Removed heavy console logging for production performance
 
       // Call the service correctly - match the method signature from ProductService
       const res = await productService.listProducts({
@@ -75,16 +75,7 @@ export default function ProductList() {
         cursorDirection: cursor ? "after" : undefined,
       });
 
-      // console.log("✅ Server response:", res);
-
       const docs = Array.isArray(res?.documents) ? res.documents : [];
-      console.log("📦 Documents received:", docs.length);
-
-      if (docs.length > 0) {
-        console.log("🔍 First product sample:", docs[0]);
-      } else {
-        console.log("⚠️ No documents received from server");
-      }
 
       const normalized = docs.map((p) => ({
         ...p,
@@ -94,19 +85,23 @@ export default function ProductList() {
           (globalThis.crypto?.randomUUID?.() || String(Math.random())),
       }));
 
-      setProducts((prev) => {
-        const map = new Map(prev.map((x) => [x.$id, x]));
-        for (const d of normalized) map.set(d.$id, d);
-        const newProducts = Array.from(map.values());
-        console.log("💾 Total products in state:", newProducts.length);
-        return newProducts;
+      // Use startTransition for non-urgent state updates to prevent blocking
+      startTransition(() => {
+        setProducts((prev) => {
+          const map = new Map(prev.map((x) => [x.$id, x]));
+          for (const d of normalized) map.set(d.$id, d);
+          return Array.from(map.values());
+        });
       });
 
       const last = normalized[normalized.length - 1];
       setServerCursor(last ? last.$id : cursor);
       return { count: normalized.length, lastId: last?.$id ?? null };
     } catch (error) {
-      console.error("❌ Error in fetchServerPage:", error);
+      // Only log errors in development
+      if (process.env.NODE_ENV === "development") {
+        console.error("Error in fetchServerPage:", error);
+      }
       throw error;
     }
   }, []);
@@ -119,38 +114,32 @@ export default function ProductList() {
       try {
         setLoading(true);
         setError(null);
-        console.log("🚀 Starting initial product load...");
 
         // Real data loading
-        console.log("🔄 Attempting to load real products from Appwrite...");
         const first = await fetchServerPage(null);
-        console.log("✅ First page loaded:", first.count, "products");
 
         if (!mounted) return;
 
         if (EAGER_PREFETCH_ALL && first.count > 0) {
-          console.log("🔄 Starting eager prefetch...");
           let cursor = first.lastId;
-          let pageCount = 1;
 
           while (mounted && cursor) {
             const { count, lastId } = await fetchServerPage(cursor);
-            pageCount++;
-            console.log(`📄 Page ${pageCount}: ${count} products`);
 
             if (count < SERVER_PAGE_SIZE) {
               setHasMoreServer(false);
-              console.log("🏁 Reached end of products");
               break;
             }
             cursor = lastId;
           }
-          console.log("✅ Eager prefetch complete");
         } else {
           setHasMoreServer(first.count === SERVER_PAGE_SIZE);
         }
       } catch (e) {
-        console.error("❌ Error fetching products:", e);
+        // Only log errors in development
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error fetching products:", e);
+        }
         if (mounted) {
           setError("Failed to load products. Please try again later.");
           // Fallback to empty state
@@ -159,10 +148,6 @@ export default function ProductList() {
       } finally {
         if (mounted) {
           setLoading(false);
-          console.log(
-            "🏁 Loading complete - products in state:",
-            products.length
-          );
         }
       }
     })();
@@ -175,11 +160,6 @@ export default function ProductList() {
   /* -------------------- filter & sort -------------------- */
   const filteredAndSorted = useMemo(() => {
     const q = query.trim().toLowerCase();
-    console.log("🔍 Filtering and sorting:", {
-      totalProducts: products.length,
-      query: q,
-      sortBy: sortBy,
-    });
 
     const filtered = q
       ? products.filter((p) => {
@@ -194,12 +174,9 @@ export default function ProductList() {
             .filter(Boolean)
             .join(" ")
             .toLowerCase();
-          const matches = searchFields.includes(q);
-          return matches;
+          return searchFields.includes(q);
         })
       : products.slice();
-
-    console.log("✅ After filtering:", filtered.length, "products");
 
     const withComputed = filtered.map((p) => ({
       p,
@@ -231,13 +208,14 @@ export default function ProductList() {
       }
     });
 
-    const result = withComputed.map((x) => x.p);
-    console.log("🎯 Final sorted products:", result.length);
-    return result;
+    return withComputed.map((x) => x.p);
   }, [products, query, sortBy]);
 
   useEffect(() => {
-    setVisibleCount(CLIENT_PAGE_SIZE);
+    // Use startTransition for non-urgent visible count updates
+    startTransition(() => {
+      setVisibleCount(CLIENT_PAGE_SIZE);
+    });
   }, [query, sortBy]);
 
   const visibleProducts = filteredAndSorted.slice(0, visibleCount);
@@ -255,7 +233,9 @@ export default function ProductList() {
         setHasMoreServer(count === SERVER_PAGE_SIZE);
         setVisibleCount((c) => c + CLIENT_PAGE_SIZE);
       } catch (e) {
-        console.error("Load more failed:", e);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Load more failed:", e);
+        }
         setError("Couldn't load more products. Please try again.");
       } finally {
         setLoadingMore(false);
@@ -265,16 +245,6 @@ export default function ProductList() {
 
   const hasQuery = query.trim().length > 0;
   const hasResults = filteredAndSorted.length > 0;
-
-  // Debug final state
-  console.log("🎨 Render state:", {
-    loading,
-    productsCount: products.length,
-    filteredCount: filteredAndSorted.length,
-    visibleCount: visibleProducts.length,
-    hasResults,
-    hasQuery,
-  });
 
   if (loading) {
     return (
@@ -405,21 +375,14 @@ export default function ProductList() {
       {hasResults && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
-            {visibleProducts.map((product, index) => {
-              console.log(
-                `🎯 Rendering product ${index}:`,
-                product?.name || "Unnamed",
-                product
-              );
-              return (
-                <div
-                  key={product.$id}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
-                >
-                  <ProductCard product={product} />
-                </div>
-              );
-            })}
+            {visibleProducts.map((product) => (
+              <div
+                key={product.$id}
+                className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
+              >
+                <ProductCard product={product} />
+              </div>
+            ))}
           </div>
 
           {/* Load more button */}

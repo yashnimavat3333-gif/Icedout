@@ -105,7 +105,10 @@ const CategoryPage = ({ category: propCategory }) => {
           setProducts(docs);
         }
       } catch (e) {
-        console.error("Failed to fetch category data:", e);
+        // Only log errors in development
+        if (process.env.NODE_ENV === "development") {
+          console.error("Failed to fetch category data:", e);
+        }
         setError(`Failed to load category data: ${e.message}`);
       } finally {
         setLoading(false);

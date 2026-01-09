@@ -1,5 +1,5 @@
 // src/components/ProductCard.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import productService from "../../appwrite/config";
 import PropTypes from "prop-types";
@@ -205,9 +205,7 @@ const ProductCard = ({ product }) => {
 
   const imageSrc = !imgError && previewUrl ? previewUrl : fallbackImg;
   const hasNumericPrice = typeof price === "number";
-  {
-    // console.log(product);
-  }
+
   return (
     <div
       onClick={() => navigate(`/product/${productId}`)}
@@ -299,4 +297,13 @@ ProductCard.propTypes = {
   }).isRequired,
 };
 
-export default ProductCard;
+// Memoize ProductCard to prevent unnecessary re-renders
+export default memo(ProductCard, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if product ID or critical props change
+  return (
+    prevProps.product?.$id === nextProps.product?.$id &&
+    prevProps.product?.name === nextProps.product?.name &&
+    prevProps.product?.price === nextProps.product?.price &&
+    JSON.stringify(prevProps.product?.images) === JSON.stringify(nextProps.product?.images)
+  );
+});

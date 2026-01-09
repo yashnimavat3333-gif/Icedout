@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
@@ -9,6 +9,36 @@ import { CartProvider } from "./context/CartContext.jsx";
 import { AuthLayout, Login } from "./components/index.js";
 import SpinnerLoader from "./components/SpinnerLoader.jsx";
 import { loadGtag } from "./lib/analytics.js";
+
+// Microsoft Clarity initialization with safe window check
+const initClarity = () => {
+  if (typeof window === "undefined") return;
+  
+  try {
+    (function(c, l, a, r, i, t, y) {
+      c[a] = c[a] || function() { (c[a].q = c[a].q || []).push(arguments) };
+      t = l.createElement(r);
+      t.async = 1;
+      t.src = "https://www.clarity.ms/tag/" + i;
+      y = l.getElementsByTagName(r)[0];
+      y.parentNode.insertBefore(t, y);
+    })(window, document, "clarity", "script", "uynsdk298");
+    
+    // Verify clarity is available globally
+    if (process.env.NODE_ENV === "development" && typeof window.clarity !== "undefined") {
+      console.log("Microsoft Clarity initialized successfully");
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("Failed to initialize Microsoft Clarity:", error);
+    }
+  }
+};
+
+// Initialize Clarity on mount
+if (typeof window !== "undefined") {
+  initClarity();
+}
 
 // Critical routes - eagerly loaded (core e-commerce functionality)
 import Home from "./pages/Home.jsx";
