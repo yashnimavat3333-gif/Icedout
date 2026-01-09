@@ -1,7 +1,3 @@
-// =======================
-// ProductDetail.jsx
-// =======================
-
 import React, {
   useEffect,
   useRef,
