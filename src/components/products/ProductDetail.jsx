@@ -1005,19 +1005,23 @@ export default function ProductDetail() {
   ]);
 
   const relatedProductsSection = useMemo(
-    () =>
-      relatedProducts.length > 0 ? (
+    () => {
+      const validProducts = Array.isArray(relatedProducts) 
+        ? relatedProducts.filter((p) => p && (p.$id || p.id))
+        : [];
+      return validProducts.length > 0 ? (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16">
           <h2 className="text-xl font-semibold text-gray-900 mb-6">
             Related Products
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-            {relatedProducts.map((p) => (
-              <ProductCard key={p.$id} product={p} />
+            {validProducts.map((p) => (
+              <ProductCard key={p.$id || p.id} product={p} />
             ))}
           </div>
         </section>
-      ) : null,
+      ) : null;
+    },
     [relatedProducts]
   );
 
