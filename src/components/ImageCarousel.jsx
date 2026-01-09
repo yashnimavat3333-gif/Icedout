@@ -13,6 +13,8 @@ const ImageBanner = () => {
           muted
           loop
           playsInline
+          preload="auto"
+          loading="eager"
         />
         
         {/* Overlay Content */}

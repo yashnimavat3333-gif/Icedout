@@ -53,7 +53,9 @@ const MostLovedWatches = () => {
 
         setLovedWatches(normalized);
       } catch (err) {
-        console.error("Error fetching most loved watches:", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error fetching most loved watches:", err);
+        }
         setError("Failed to load watches.");
       } finally {
         setLoading(false);

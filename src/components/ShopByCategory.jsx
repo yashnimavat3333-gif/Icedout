@@ -38,7 +38,9 @@ const ShopByCategory = () => {
 
         setCategories(res.documents);
       } catch (err) {
-        console.error("Failed to fetch categories", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Failed to fetch categories", err);
+        }
         setError("Failed to load categories. Please try again.");
       } finally {
         setLoading(false);

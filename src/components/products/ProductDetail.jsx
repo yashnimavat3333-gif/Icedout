@@ -369,7 +369,9 @@ export default function ProductDetail() {
           setSelectedVarIndex(firstInStock >= 0 ? firstInStock : 0);
         }
       } catch (err) {
-        console.error("Error fetching product:", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error fetching product:", err);
+        }
         setError("Failed to load product. Please try again.");
       } finally {
         setLoading(false);
@@ -397,7 +399,9 @@ export default function ProductDetail() {
         );
         setRelatedProducts(rel.documents || []);
       } catch (err) {
-        console.error("Error fetching related products:", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("Error fetching related products:", err);
+        }
       }
     };
 
@@ -419,7 +423,9 @@ export default function ProductDetail() {
         try {
           mainSwiper.slideTo(index);
         } catch (e) {
-          console.warn("mainSwiper.slideTo failed", e);
+          if (process.env.NODE_ENV === "development") {
+            console.warn("mainSwiper.slideTo failed", e);
+          }
         }
       }
     },
@@ -542,8 +548,8 @@ export default function ProductDetail() {
   const productInfoSection = useMemo(() => {
     if (!product) return null;
 
-    const getCategoryText = (category) => {
-      const categoryLower = category?.toLowerCase() || "";
+    const categoryText = useMemo(() => {
+      const categoryLower = product?.categories?.toLowerCase() || "";
       if (categoryLower === "luxury watch") {
         return "💎 Set with VVS1 D-Color Moissanite Diamonds · Precision-set for maximum brilliance";
       } else if (categoryLower === "plain watch") {
@@ -553,16 +559,13 @@ export default function ProductDetail() {
       }
       // Default fallback
       return "⭐ Quality-tested & customer-approved · Inspected before dispatch";
-    };
-
-    const categoryText = getCategoryText(product.categories);
+    }, [product?.categories]);
 
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-[20px] font-normal text-gray-900">
             {product.name || "Product Name"}
-            {/* {console.log(product)} */}
           </h1>
           <p className="text-sm text-gray-500 uppercase tracking-wider mt-1">
             {product.subtitle || product.categories || "Product Category"}
@@ -1033,10 +1036,13 @@ export default function ProductDetail() {
     );
   if (!product) return null;
 
-  // ZoomContent with local fallback
-  const ZoomContent = () => {
+  // ZoomContent with local fallback - memoized to prevent re-renders
+  const ZoomContent = useMemo(() => {
     const m = product?.processedMedia?.[selectedImage];
-    const url = (m && m.view) || UPLOADED_FALLBACK;
+    const fileId = m?.fileId;
+    const url = fileId
+      ? productService.getOptimizedImageUrl(fileId, 1600)
+      : (m && m.view) || UPLOADED_FALLBACK;
     const isVideo = (url || "").match(/\.(mp4|webm|ogg)(\?|$)/i);
 
     const commonStyle = {
@@ -1074,6 +1080,8 @@ export default function ProductDetail() {
         width={1600}
         height={1600}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         style={{
           ...commonStyle,
           cursor: "auto",
@@ -1082,7 +1090,7 @@ export default function ProductDetail() {
         }}
       />
     );
-  };
+  }, [product?.processedMedia, selectedImage, product?.name]);
 
   return (
     <>
@@ -1269,7 +1277,7 @@ export default function ProductDetail() {
                   wrapperClass="w-full h-full flex items-center justify-center"
                   contentClass="flex items-center justify-center"
                 >
-                  <ZoomContent />
+                  {ZoomContent}
                 </TransformComponent>
               )}
             </TransformWrapper>
