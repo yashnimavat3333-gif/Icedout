@@ -196,6 +196,7 @@ export default function ProductDetail() {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
   const panRef = useRef({
     dragging: false,
     startX: 0,
@@ -215,6 +216,16 @@ export default function ProductDetail() {
 
   useEffect(() => setIsClient(true), []);
   useEffect(() => window.scrollTo({ top: 0, behavior: "smooth" }), [loading]);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Ensure session (private buckets)
   useEffect(() => {
@@ -513,35 +524,38 @@ export default function ProductDetail() {
     (ev) => {
       if (!ev.touches) return;
       
+      // Prevent default to avoid scrolling and other browser behaviors
+      ev.preventDefault();
+      
       if (ev.touches.length === 2) {
         // Start pinch - disable transitions for smooth pinch
         const d = getDistance(ev.touches[0], ev.touches[1]);
         pinchRef.current.initialDistance = d;
         pinchRef.current.startScale = zoomScale;
-        ev.preventDefault();
+        // Reset pan origin when starting pinch
+        panRef.current.dragging = false;
       } else if (ev.touches.length === 1) {
-        // Double-tap to toggle zoom (more responsive timing)
+        // Double-tap to toggle zoom (optimized for mobile)
         const now = Date.now();
         const timeSinceLastTap = now - lastTapRef.current;
         
-        if (timeSinceLastTap < 350 && timeSinceLastTap > 0) {
-          // Double tap detected
+        if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+          // Double tap detected - smooth zoom toggle
           requestAnimationFrame(() => {
-            if (zoomScale <= 1.01) {
-              setZoomScale(2.5); // Zoom in to 2.5x for better detail inspection
+            if (zoomScale <= 1.05) {
+              setZoomScale(2.5); // Zoom in to 2.5x for detail inspection
             } else {
               setZoomScale(1);
               setPan({ x: 0, y: 0 });
             }
           });
           lastTapRef.current = 0;
-          ev.preventDefault();
           return;
         }
         lastTapRef.current = now;
         
-        // Start pan if zoomed
-        if (zoomScale > 1) {
+        // Start pan if zoomed (smooth drag)
+        if (zoomScale > 1.05) {
           const touch = ev.touches[0];
           onPanStart(touch.clientX, touch.clientY);
         }
@@ -556,20 +570,24 @@ export default function ProductDetail() {
       ev.preventDefault(); // Prevent scrolling while zooming/panning
       
       if (ev.touches.length === 2) {
-        // Smooth pinch to zoom
+        // Smooth pinch to zoom - real-time scaling
         const d = getDistance(ev.touches[0], ev.touches[1]);
         const initial = pinchRef.current.initialDistance || d;
+        if (initial === 0) {
+          pinchRef.current.initialDistance = d;
+          pinchRef.current.startScale = zoomScale;
+          return;
+        }
         const startScale = pinchRef.current.startScale || zoomScale;
         
         // Calculate scale with smooth interpolation
         let scale = (startScale * d) / initial;
         scale = Math.min(4, Math.max(0.5, scale));
         
-        // Smooth scale updates using requestAnimationFrame for better performance
-        requestAnimationFrame(() => {
-          setZoomScale(+scale.toFixed(3));
-        });
-      } else if (ev.touches.length === 1 && zoomScale > 1) {
+        // Direct update for smooth, real-time pinch response
+        setZoomScale(+scale.toFixed(3));
+      } else if (ev.touches.length === 1 && zoomScale > 1.05) {
+        // Smooth pan when zoomed in
         const t = ev.touches[0];
         onPanMove(t.clientX, t.clientY);
       }
@@ -1374,7 +1392,7 @@ export default function ProductDetail() {
       {/* Zoom / Fullscreen Modal (mobile-friendly) */}
       {zoomOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2"
+          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
@@ -1383,74 +1401,105 @@ export default function ProductDetail() {
           onWheel={onWheel}
           style={{ touchAction: "none" }}
         >
-          {/* top-right controls - hide range slider on small screens */}
-          <div className="absolute top-4 right-4 flex items-center gap-2 z-40">
-            <button
-              onClick={() => changeZoom(-0.25)}
-              className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-              title="Zoom out"
-            >
-              −
-            </button>
+          {/* Desktop controls - hidden on mobile */}
+          {!isMobile && (
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-40">
+              <button
+                onClick={() => changeZoom(-0.25)}
+                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
+                title="Zoom out"
+              >
+                −
+              </button>
 
-            {/* slider visible on sm+ */}
-            <input
-              type="range"
-              min={0.5}
-              max={4}
-              step={0.01}
-              value={zoomScale}
-              onChange={onZoomSlider}
-              className="hidden sm:block w-44"
-            />
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.01}
+                value={zoomScale}
+                onChange={onZoomSlider}
+                className="w-44"
+              />
 
-            <button
-              onClick={() => changeZoom(0.25)}
-              className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-              title="Zoom in"
-            >
-              +
-            </button>
+              <button
+                onClick={() => changeZoom(0.25)}
+                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
+                title="Zoom in"
+              >
+                +
+              </button>
 
-            <button
-              onClick={() => goPrev()}
-              className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-              title="Previous"
-            >
-              Prev
-            </button>
+              <button
+                onClick={() => goPrev()}
+                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
+                title="Previous"
+              >
+                Prev
+              </button>
 
-            <button
-              onClick={() => goNext()}
-              className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-              title="Next"
-            >
-              Next
-            </button>
+              <button
+                onClick={() => goNext()}
+                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
+                title="Next"
+              >
+                Next
+              </button>
 
+              <button
+                onClick={closeZoom}
+                className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
+                title="Close"
+              >
+                Close
+              </button>
+            </div>
+          )}
+
+          {/* Mobile-only close button - subtle and unobtrusive, positioned to avoid gesture interference */}
+          {isMobile && (
             <button
-              onClick={closeZoom}
-              className="px-3 py-2 bg-white/95 rounded-md text-sm touch-manipulation"
-              title="Close"
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                closeZoom();
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="absolute top-4 right-4 z-50 w-10 h-10 flex items-center justify-center bg-black/60 hover:bg-black/80 rounded-full text-white touch-manipulation"
+              aria-label="Close zoom"
             >
-              Close
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
             </button>
-          </div>
+          )}
 
           {/* central viewport */}
           <div
             className="w-full h-full max-w-[100vw] max-h-[100vh] flex items-center justify-center"
             onMouseDown={(e) => {
-              if (e.button === 0 && zoomScale > 1)
+              if (!isMobile && e.button === 0 && zoomScale > 1)
                 onPanStart(e.clientX, e.clientY);
             }}
-            onMouseLeave={() => onMouseUp()}
+            onMouseLeave={() => !isMobile && onMouseUp()}
             onDoubleClick={() => {
-              if (zoomScale <= 1.01) {
-                setZoomScale(2);
-              } else {
-                setZoomScale(1);
-                setPan({ x: 0, y: 0 });
+              if (!isMobile) {
+                if (zoomScale <= 1.01) {
+                  setZoomScale(2);
+                } else {
+                  setZoomScale(1);
+                  setPan({ x: 0, y: 0 });
+                }
               }
             }}
             role="dialog"
@@ -1468,20 +1517,20 @@ export default function ProductDetail() {
               }}
             >
               <div
-              style={{
-                transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(1)`,
-                transition: panRef.current.dragging
-                  ? "none"
-                  : "transform 150ms cubic-bezier(0.4, 0, 0.2, 1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                maxWidth: "100%",
-                maxHeight: "100%",
-                willChange: panRef.current.dragging ? "transform" : "auto",
-              }}
+                style={{
+                  transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(1)`,
+                  transition: panRef.current.dragging || pinchRef.current.initialDistance > 0
+                    ? "none"
+                    : "transform 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  maxWidth: "100%",
+                  maxHeight: "100%",
+                  willChange: panRef.current.dragging || pinchRef.current.initialDistance > 0 ? "transform" : "auto",
+                }}
                 onMouseDown={(e) => {
-                  if (zoomScale > 1) onPanStart(e.clientX, e.clientY);
+                  if (!isMobile && zoomScale > 1) onPanStart(e.clientX, e.clientY);
                 }}
               >
                 <div
