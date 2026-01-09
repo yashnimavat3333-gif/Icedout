@@ -23,7 +23,7 @@ const initClarity = () => {
       t.src = "https://www.clarity.ms/tag/" + i;
       y = l.getElementsByTagName(r)[0];
       y.parentNode.insertBefore(t, y);
-    })(window, document, "clarity", "script", "uynsdk298");
+    })(window, document, "clarity", "script", "uynsdkk298");
     
     // Verify clarity is available globally
     if (process.env.NODE_ENV === "development" && typeof window.clarity !== "undefined") {
