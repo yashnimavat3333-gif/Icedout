@@ -1,7 +1,16 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 const ImageBanner = () => {
   const navigate = useNavigate();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
