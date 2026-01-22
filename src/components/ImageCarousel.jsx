@@ -6,25 +6,45 @@ const ImageCarousel = () => {
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
       <div className="aspect-w-16 h-[20rem] aspect-h-[20rem] lg:h-[700px] relative">
-        {/* Hero Image */}
+        {/* Hero Image - Try local image first, then fallback to professional jewellery image */}
         <img
-          src="/IMG_3084.jpg"
+          src="/IMG_3084.JPG"
           alt="Premium Timepieces & Fine Jewellery"
           className="w-full h-full object-cover"
+          loading="eager"
           onError={(e) => {
-            // Try alternative extensions if .jpg fails
-            const extensions = ['.jpeg', '.png', '.webp'];
-            const currentSrc = e.target.src;
-            const basePath = currentSrc.substring(0, currentSrc.lastIndexOf('.'));
-            const currentExt = currentSrc.substring(currentSrc.lastIndexOf('.'));
-            const currentIndex = extensions.indexOf(currentExt);
+            const img = e.target;
+            const currentSrc = img.src;
             
-            if (currentIndex < extensions.length - 1) {
-              e.target.src = basePath + extensions[currentIndex + 1];
+            // Track attempts to avoid infinite loop
+            if (!img.dataset.attempts) {
+              img.dataset.attempts = '1';
             } else {
-              // Fallback to gradient if all extensions fail
-              e.target.style.display = 'none';
-              e.target.parentElement.classList.add('bg-gradient-to-br', 'from-gray-900', 'via-gray-800', 'to-gray-900');
+              const attempts = parseInt(img.dataset.attempts) || 0;
+              img.dataset.attempts = (attempts + 1).toString();
+            }
+            
+            const attempts = parseInt(img.dataset.attempts) || 1;
+            
+            // Try different extensions
+            if (attempts === 1) {
+              img.src = '/IMG_3084.jpg';
+            } else if (attempts === 2) {
+              img.src = '/IMG_3084.jpeg';
+            } else if (attempts === 3) {
+              img.src = '/IMG_3084.png';
+            } else {
+              // All local attempts failed, use professional luxury watch/jewellery image
+              // High-quality Unsplash image of luxury watches
+              img.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80';
+              
+              // Final fallback to gradient if even Unsplash fails
+              img.onerror = () => {
+                img.style.display = 'none';
+                if (img.parentElement) {
+                  img.parentElement.classList.add('bg-gradient-to-br', 'from-gray-900', 'via-gray-800', 'to-gray-900');
+                }
+              };
             }
           }}
         />
