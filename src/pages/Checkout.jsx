@@ -1027,13 +1027,6 @@ const CheckoutPage = () => {
     setPromoError("");
   };
 
-  const viewImageSrc = (fileId) => {
-    if (!fileId) return "";
-    if (typeof bucket?.getFilePreview === "function")
-      return bucket.getFilePreview(conf.appwriteReviewBucketId, fileId);
-    return `/api/bucket/preview/${conf.appwriteReviewBucketId}/${fileId}`;
-  };
-
   // Local page state
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
 
