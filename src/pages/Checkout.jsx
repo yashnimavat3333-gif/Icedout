@@ -1046,22 +1046,69 @@ const CheckoutPage = () => {
         }),
       });
 
+      // Handle non-OK responses
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || "Failed to create payment link");
+        let errorMessage = "Failed to create payment link";
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText && errorText.trim()) {
+              errorMessage = errorText;
+            } else {
+              errorMessage = `Server error: ${response.status} ${response.statusText}`;
+            }
+          } catch (textError) {
+            errorMessage = `Server error: ${response.status} ${response.statusText}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
-
-      if (data.paymentUrl) {
-        // Redirect to Wise payment URL
-        window.location.href = data.paymentUrl;
-      } else {
-        throw new Error("Payment URL not received");
+      // Parse successful response
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        throw new Error("Invalid response from server. Please try again.");
       }
+
+      // Validate payment URL
+      if (!data.paymentUrl) {
+        throw new Error("Payment URL not received from server");
+      }
+
+      // Validate URL format before redirecting
+      try {
+        const url = new URL(data.paymentUrl);
+        if (!url.protocol.startsWith("http")) {
+          throw new Error("Invalid payment URL format");
+        }
+      } catch (urlError) {
+        throw new Error("Invalid payment URL received. Please contact support.");
+      }
+
+      // Redirect to Wise payment URL
+      window.location.href = data.paymentUrl;
+      // Note: setWiseLoading(false) is not called here because we're redirecting
+      
     } catch (error) {
       console.error("Wise payment error:", error);
-      setWiseError(error.message || "Failed to create payment link. Please try again.");
+      
+      // Provide user-friendly error message
+      let userMessage = "Failed to create payment link. Please try again.";
+      if (error.message) {
+        userMessage = error.message;
+      } else if (error instanceof TypeError && error.message.includes("fetch")) {
+        userMessage = "Network error. Please check your connection and try again.";
+      }
+      
+      setWiseError(userMessage);
       setWiseLoading(false);
     }
   };

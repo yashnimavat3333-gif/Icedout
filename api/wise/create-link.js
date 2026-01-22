@@ -10,6 +10,13 @@
  * 
  * Note: This function runs in Node.js environment (Vercel serverless)
  * Uses Node.js global fetch (available in Node.js 18+)
+ * 
+ * Common Issues:
+ * 1. Verify WISE_API_TOKEN has correct permissions (payment links creation)
+ * 2. Verify WISE_PROFILE_ID is correct for your Wise business account
+ * 3. Check if your Wise account has Payment Links feature enabled
+ * 4. API endpoint might need to be different based on your Wise account region
+ * 5. Amount format might need to be in minor units (cents) - check Wise API docs
  */
 
 export default async function handler(req, res) {
@@ -60,9 +67,15 @@ export default async function handler(req, res) {
     }
 
     // Prepare Wise Payment Links API request
+    // Note: Wise API endpoint may vary - try both common endpoints
+    // Primary: https://api.wise.com/v1/payment-links
+    // Alternative: https://api.transferwise.com/v1/payment-links
     const wiseApiUrl = 'https://api.wise.com/v1/payment-links';
     const redirectUrl = 'https://iceyout.com/thank-you';
 
+    // Wise API request body format
+    // Amount should be in minor units (cents for USD) or as decimal string
+    // Try both formats to handle different API versions
     const requestBody = {
       profileId: profileId,
       amount: {
@@ -75,12 +88,24 @@ export default async function handler(req, res) {
       }
     };
 
+    // Log request details (without sensitive data) for debugging
+    console.log('Wise API request:', {
+      url: wiseApiUrl,
+      method: 'POST',
+      hasToken: !!apiToken,
+      hasProfileId: !!profileId,
+      amount: amount,
+      orderId: orderId,
+      redirectUrl: redirectUrl
+    });
+
     // Call Wise API
     const response = await fetch(wiseApiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify(requestBody)
     });
@@ -108,11 +133,20 @@ export default async function handler(req, res) {
         responseHeaders = { error: 'Could not read headers' };
       }
       
+      // Log comprehensive error details for debugging
       console.error('Wise API error response:', {
         status: response.status,
         statusText: response.statusText,
+        url: wiseApiUrl,
         headers: responseHeaders,
-        body: errorBody
+        body: errorBody,
+        requestBody: {
+          profileId: profileId ? '***' : 'MISSING',
+          amount: amount,
+          currency: 'USD',
+          redirectUrl: redirectUrl,
+          orderId: orderId
+        }
       });
       
       // Extract clear error message from Wise response
