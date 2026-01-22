@@ -6,25 +6,31 @@ const ImageCarousel = () => {
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
       <div className="aspect-w-16 h-[20rem] aspect-h-[20rem] lg:h-[700px] relative">
-        <video
-          src="https://fra.cloud.appwrite.io/v1/storage/buckets/6876009e002e889ffa51/files/691ec7db0033909fe4c3/view?project=6875fd9e000f3ec8a910"
+        {/* Hero Image */}
+        <img
+          src="/IMG_3084.jpg"
+          alt="Premium Timepieces & Fine Jewellery"
           className="w-full h-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          loading="lazy"
-          width="1920"
-          height="700"
           onError={(e) => {
-            console.warn("Video failed to load, showing fallback");
-            e.target.style.display = "none";
+            // Try alternative extensions if .jpg fails
+            const extensions = ['.jpeg', '.png', '.webp'];
+            const currentSrc = e.target.src;
+            const basePath = currentSrc.substring(0, currentSrc.lastIndexOf('.'));
+            const currentExt = currentSrc.substring(currentSrc.lastIndexOf('.'));
+            const currentIndex = extensions.indexOf(currentExt);
+            
+            if (currentIndex < extensions.length - 1) {
+              e.target.src = basePath + extensions[currentIndex + 1];
+            } else {
+              // Fallback to gradient if all extensions fail
+              e.target.style.display = 'none';
+              e.target.parentElement.classList.add('bg-gradient-to-br', 'from-gray-900', 'via-gray-800', 'to-gray-900');
+            }
           }}
         />
         
-        {/* Overlay Content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-4">
+        {/* Hero Content Overlay */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 px-4">
           <h1 className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-4 max-w-4xl">
             Premium Timepieces & Fine Jewellery — Trusted by Customers Worldwide
           </h1>
