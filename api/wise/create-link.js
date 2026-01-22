@@ -6,7 +6,7 @@
  * Body: { amount: number, orderId: string }
  * Returns: { paymentUrl: string }
  * 
- * Uses process.env.WISE_API_TOKEN (set in Vercel dashboard)
+ * Uses process.env.WISE_API_TOKEN and process.env.WISE_PROFILE_ID (set in Vercel dashboard)
  */
 
 export default async function handler(req, res) {
@@ -19,10 +19,20 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Validate required environment variable
+    // Validate required environment variables
     const apiToken = process.env.WISE_API_TOKEN;
+    const profileId = process.env.WISE_PROFILE_ID;
+    
     if (!apiToken) {
       console.error('WISE_API_TOKEN is not configured');
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'Payment service is not properly configured' 
+      });
+    }
+    
+    if (!profileId) {
+      console.error('WISE_PROFILE_ID is not configured');
       return res.status(500).json({ 
         error: 'Server configuration error',
         message: 'Payment service is not properly configured' 
@@ -51,6 +61,7 @@ export default async function handler(req, res) {
     const redirectUrl = 'https://iceyout.com/thank-you';
 
     const requestBody = {
+      profileId: profileId,
       amount: {
         value: amount,
         currency: 'USD'
@@ -74,11 +85,49 @@ export default async function handler(req, res) {
     // Handle Wise API response
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Wise API error:', response.status, errorText);
+      let errorBody = errorText;
+      
+      // Try to parse as JSON for better logging
+      try {
+        errorBody = JSON.parse(errorText);
+      } catch {
+        // Keep as text if not JSON
+        errorBody = errorText;
+      }
+      
+      // Log full Wise API error details (server-side only)
+      // Note: These are response headers from Wise, not our request headers (which contain the token)
+      let responseHeaders = {};
+      try {
+        responseHeaders = Object.fromEntries(response.headers.entries());
+      } catch (e) {
+        // Fallback if headers can't be read
+        responseHeaders = { error: 'Could not read headers' };
+      }
+      
+      console.error('Wise API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders,
+        body: errorBody
+      });
+      
+      // Extract clear error message from Wise response
+      let errorMessage = 'Failed to create payment link. Please try again.';
+      if (typeof errorBody === 'object' && errorBody !== null) {
+        // Try common error message fields
+        errorMessage = errorBody.message || 
+                      errorBody.error?.message || 
+                      errorBody.error || 
+                      errorMessage;
+      } else if (typeof errorBody === 'string' && errorBody.trim()) {
+        // Use error text if it's a meaningful string
+        errorMessage = errorBody;
+      }
       
       return res.status(response.status || 500).json({ 
         error: 'Payment link creation failed',
-        message: 'Failed to create payment link. Please try again.' 
+        message: errorMessage 
       });
     }
 

@@ -218,6 +218,8 @@ const CheckoutPage = () => {
   const [isFormValid, setIsFormValid] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
   const [userOrders, setUserOrders] = useState([]);
+  const [wiseLoading, setWiseLoading] = useState(false);
+  const [wiseError, setWiseError] = useState(null);
   const paypalRef = useRef(null);
 
   const cartItems = Array.isArray(cart) ? cart : [];
@@ -1027,6 +1029,43 @@ const CheckoutPage = () => {
     setPromoError("");
   };
 
+  // Handle Wise payment test button
+  const handleWisePayment = async () => {
+    setWiseLoading(true);
+    setWiseError(null);
+
+    try {
+      const response = await fetch("/api/wise/create-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          amount: 100,
+          orderId: "iceyout-test-001",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || "Failed to create payment link");
+      }
+
+      const data = await response.json();
+
+      if (data.paymentUrl) {
+        // Redirect to Wise payment URL
+        window.location.href = data.paymentUrl;
+      } else {
+        throw new Error("Payment URL not received");
+      }
+    } catch (error) {
+      console.error("Wise payment error:", error);
+      setWiseError(error.message || "Failed to create payment link. Please try again.");
+      setWiseLoading(false);
+    }
+  };
+
   // Local page state
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
 
@@ -1450,6 +1489,29 @@ const CheckoutPage = () => {
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
                   <Lock className="w-4 h-4" />
                   <span>Secure payment powered by PayPal</span>
+                </div>
+
+                {/* Wise Test Payment Button */}
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={handleWisePayment}
+                    disabled={wiseLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                  >
+                    {wiseLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Creating payment link...</span>
+                      </>
+                    ) : (
+                      <span>Pay with Wise (TEST)</span>
+                    )}
+                  </button>
+                  {wiseError && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-800">{wiseError}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
