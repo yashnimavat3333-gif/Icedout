@@ -746,20 +746,6 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        {hasVariationsProduct && activeVariation && (
-          <div className="text-sm text-gray-600 space-x-3">
-            <span className="font-medium">Variant:</span>
-            <span>{activeVariation?.name ?? "—"}</span>
-            {activeVariation?.sku ? (
-              <span>• SKU: {activeVariation.sku}</span>
-            ) : null}
-            {activeVariation?.stock !== undefined &&
-            activeVariation?.stock !== null ? (
-              <span>• Stock: {toNumber(activeVariation.stock) ?? "—"}</span>
-            ) : null}
-          </div>
-        )}
-
         {hasVariationsProduct && product.variations && (
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-sm font-medium text-gray-900 mb-2">
