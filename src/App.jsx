@@ -1,36 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import "./App.css";
 import authService from "./appwrite/auth";
 import { login, logout } from "./store/authSlice";
 import { Footer, Header } from "./components";
 import { Outlet } from "react-router-dom";
-import { ReactLenis } from "lenis/react";
+// ReactLenis disabled to prevent performance issues and periodic freezes
 
 function App() {
   const [loading, setLoading] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
   const dispatch = useDispatch();
-  const lenisRef = useRef();
 
-  // Detect mobile on mount
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // // ✅ Sync Lenis with GSAP properly
-  // useEffect(() => {
-  //   const raf = (time) => {
-  //     lenisRef.current?.lenis?.raf(time);
-  //   };
-  //   gsap.ticker.add(raf);
-  //   return () => gsap.ticker.remove(raf);
-  // }, []);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -89,7 +69,10 @@ function App() {
     );
   }
 
-  const content = (
+  // Completely disable ReactLenis to prevent periodic freezes
+  // Smooth scroll libraries can cause performance issues, especially on mobile
+  // Native browser scrolling is more performant and reliable
+  return (
     <div className="min-h-screen flex flex-col justify-between">
       <Header />
       <main className="bg-white min-h-screen">
@@ -97,25 +80,6 @@ function App() {
       </main>
       <Footer />
     </div>
-  );
-
-  // Disable Lenis smooth scroll on mobile to prevent freezes on iPhones
-  if (isMobile) {
-    return content;
-  }
-
-  return (
-    <ReactLenis
-      root
-      options={{ 
-        duration: 1.2, 
-        smoothTouch: false, // Disable on touch devices
-        smoothWheel: true,
-        wheelMultiplier: 0.8
-      }}
-    >
-      {content}
-    </ReactLenis>
   );
 }
 

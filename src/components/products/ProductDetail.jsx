@@ -27,16 +27,38 @@ const ThumbMedia = React.memo(({ src, alt }) => {
   const [loaded, setLoaded] = useState(false);
   const videoRef = useRef(null);
 
+  // Optimized video visibility handling - throttled to prevent performance issues
   useEffect(() => {
     if (mode !== "video" || !videoRef.current) return;
     const v = videoRef.current;
-    if (document.visibilityState === "hidden") {
-      try {
-        v.pause();
-      } catch {}
-    } else {
+    
+    // Throttle visibility checks to prevent excessive calls
+    let visibilityTimeout;
+    const handleVisibilityChange = () => {
+      clearTimeout(visibilityTimeout);
+      visibilityTimeout = setTimeout(() => {
+        if (document.visibilityState === "hidden") {
+          try {
+            v.pause();
+          } catch {}
+        } else {
+          v.play().catch(() => {});
+        }
+      }, 100);
+    };
+    
+    // Only check on visibility change, not continuously
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Initial check
+    if (document.visibilityState !== "hidden") {
       v.play().catch(() => {});
     }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearTimeout(visibilityTimeout);
+    };
   }, [mode]);
 
   return (
