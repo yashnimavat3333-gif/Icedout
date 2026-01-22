@@ -6,17 +6,12 @@
  * Body: { amount: number, orderId: string }
  * Returns: { paymentUrl: string }
  * 
- * Uses process.env.WISE_API_TOKEN and process.env.WISE_PROFILE_ID (set in Vercel dashboard)
+ * Uses process.env.WISE_API_TOKEN and process.env.WISE_MEMBERSHIP_NUMBER (set in Vercel dashboard)
  * 
  * Note: This function runs in Node.js environment (Vercel serverless)
  * Uses Node.js global fetch (available in Node.js 18+)
  * 
- * Common Issues:
- * 1. Verify WISE_API_TOKEN has correct permissions (payment links creation)
- * 2. Verify WISE_PROFILE_ID is correct for your Wise business account
- * 3. Check if your Wise account has Payment Links feature enabled
- * 4. API endpoint might need to be different based on your Wise account region
- * 5. Amount format might need to be in minor units (cents) - check Wise API docs
+ * Wise Membership Number: Starts with "P" (e.g., P61100320) from Wise business account
  */
 
 export default async function handler(req, res) {
@@ -31,7 +26,7 @@ export default async function handler(req, res) {
   try {
     // Validate required environment variables
     const apiToken = process.env.WISE_API_TOKEN;
-    const profileId = process.env.WISE_PROFILE_ID;
+    const membershipNumber = process.env.WISE_MEMBERSHIP_NUMBER;
     
     if (!apiToken) {
       console.error('WISE_API_TOKEN is not configured');
@@ -41,11 +36,20 @@ export default async function handler(req, res) {
       });
     }
     
-    if (!profileId) {
-      console.error('WISE_PROFILE_ID is not configured');
+    if (!membershipNumber) {
+      console.error('WISE_MEMBERSHIP_NUMBER is not configured');
       return res.status(500).json({ 
         error: 'Server configuration error',
         message: 'Payment service is not properly configured' 
+      });
+    }
+
+    // Validate membership number format (should start with "P")
+    if (!membershipNumber.startsWith('P')) {
+      console.error('WISE_MEMBERSHIP_NUMBER format invalid (should start with P)');
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'Invalid membership number format' 
       });
     }
 
@@ -67,17 +71,15 @@ export default async function handler(req, res) {
     }
 
     // Prepare Wise Payment Links API request
-    // Note: Wise API endpoint may vary - try both common endpoints
-    // Primary: https://api.wise.com/v1/payment-links
-    // Alternative: https://api.transferwise.com/v1/payment-links
+    // Wise API endpoint: https://api.wise.com/v1/payment-links
     const wiseApiUrl = 'https://api.wise.com/v1/payment-links';
     const redirectUrl = 'https://iceyout.com/thank-you';
 
     // Wise API request body format
-    // Amount should be in minor units (cents for USD) or as decimal string
-    // Try both formats to handle different API versions
+    // profileId should be the membership number (starts with "P")
+    // amount.value can be a number (Wise API accepts decimal values)
     const requestBody = {
-      profileId: profileId,
+      profileId: membershipNumber,
       amount: {
         value: amount,
         currency: 'USD'
@@ -93,8 +95,10 @@ export default async function handler(req, res) {
       url: wiseApiUrl,
       method: 'POST',
       hasToken: !!apiToken,
-      hasProfileId: !!profileId,
+      hasMembershipNumber: !!membershipNumber,
+      membershipNumberPrefix: membershipNumber ? membershipNumber.substring(0, 2) : 'N/A',
       amount: amount,
+      currency: 'USD',
       orderId: orderId,
       redirectUrl: redirectUrl
     });
@@ -141,7 +145,7 @@ export default async function handler(req, res) {
         headers: responseHeaders,
         body: errorBody,
         requestBody: {
-          profileId: profileId ? '***' : 'MISSING',
+          profileId: membershipNumber ? `${membershipNumber.substring(0, 2)}***` : 'MISSING',
           amount: amount,
           currency: 'USD',
           redirectUrl: redirectUrl,
