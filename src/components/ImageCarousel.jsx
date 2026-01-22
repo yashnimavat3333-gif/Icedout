@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 
-const ImageBanner = () => {
+const ImageCarousel = () => {
   const navigate = useNavigate();
 
   return (
@@ -13,6 +13,10 @@ const ImageBanner = () => {
           muted
           loop
           playsInline
+          onError={(e) => {
+            console.warn("Video failed to load, showing fallback");
+            e.target.style.display = "none";
+          }}
         />
         
         {/* Overlay Content */}
@@ -35,4 +39,4 @@ const ImageBanner = () => {
   );
 };
 
-export default ImageBanner;
+export default ImageCarousel;

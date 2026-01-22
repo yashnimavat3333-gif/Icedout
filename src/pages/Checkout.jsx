@@ -12,11 +12,23 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import emailjs from "@emailjs/browser";
 
-// Appwrite configuration (keep as-is)
-const APPWRITE_ENDPOINT = "https://cloud.appwrite.io/v1";
-const APPWRITE_PROJECT_ID = "6875fd9e000f3ec8a910";
-const APPWRITE_DATABASE_ID = "6875fde500233e4b5b8d";
-const APPWRITE_COLLECTION_ID = "6911eeee00020c3218d5";
+// Appwrite configuration - use environment variables for consistency
+const APPWRITE_ENDPOINT = 
+  typeof import.meta !== "undefined"
+    ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
+    : "https://cloud.appwrite.io/v1";
+const APPWRITE_PROJECT_ID = 
+  typeof import.meta !== "undefined"
+    ? import.meta.env.VITE_APPWRITE_PROJECT_ID || "6875fd9e000f3ec8a910"
+    : "6875fd9e000f3ec8a910";
+const APPWRITE_DATABASE_ID = 
+  typeof import.meta !== "undefined"
+    ? import.meta.env.VITE_APPWRITE_DATABASE_ID || "6875fde500233e4b5b8d"
+    : "6875fde500233e4b5b8d";
+const APPWRITE_COLLECTION_ID = 
+  typeof import.meta !== "undefined"
+    ? import.meta.env.VITE_APPWRITE_COLLECTION_ID || "6911eeee00020c3218d5"
+    : "6911eeee00020c3218d5";
 
 // Read PayPal client id from environment. (Vite: VITE_PAYPAL_CLIENT_ID)
 const ENV_PAYPAL_CLIENT_ID =
@@ -41,40 +53,6 @@ const ENV_EMAILJS_PUBLIC_KEY =
 // Lazy Appwrite holders
 let appwriteClient = null;
 let appwriteDatabases = null;
-
-// Initialize Appwrite client lazily (adds SDK script if needed)
-const initializeAppwrite = () => {
-  if (typeof window === "undefined" || appwriteClient) return;
-  const existing = Array.from(document.querySelectorAll("script[src]")).find(
-    (s) => s.src && s.src.includes("cdn.jsdelivr.net/npm/appwrite")
-  );
-  if (existing && window.Appwrite) {
-    const { Client, Databases } = window.Appwrite;
-    appwriteClient = new Client()
-      .setEndpoint(APPWRITE_ENDPOINT)
-      .setProject(APPWRITE_PROJECT_ID);
-    appwriteDatabases = new Databases(appwriteClient);
-    return;
-  }
-
-  const script = document.createElement("script");
-  script.src = "https://cdn.jsdelivr.net/npm/appwrite@14.0.1";
-  script.async = true;
-  document.head.appendChild(script);
-
-  script.onload = () => {
-    if (!window.Appwrite) return;
-    const { Client, Databases } = window.Appwrite;
-    appwriteClient = new Client()
-      .setEndpoint(APPWRITE_ENDPOINT)
-      .setProject(APPWRITE_PROJECT_ID);
-    appwriteDatabases = new Databases(appwriteClient);
-  };
-
-  script.onerror = () => {
-    console.error("Failed to load Appwrite SDK");
-  };
-};
 
 // sleep helper
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
@@ -209,101 +187,6 @@ async function ensureAppwriteReady({ timeoutMs = 8000 } = {}) {
     }, timeoutMs + 200);
   });
 }
-
-// Replace saveOrderToAppwrite with this version that waits for Appwrite
-const saveOrderToAppwrite = async (orderData, finalAmt, discountAmt, promo) => {
-  try {
-    const ready = await ensureAppwriteReady({ timeoutMs: 10000 }); // increase if needed
-    if (!ready || !appwriteDatabases) {
-      throw new Error("Appwrite not initialized (timed out)");
-    }
-
-    const { ID } = window.Appwrite;
-
-    // attempt to get user id (non-blocking fallback)
-    let appwriteUserId = null;
-    try {
-      appwriteUserId = await getAppwriteUserId();
-    } catch {
-      appwriteUserId = null;
-    }
-
-    const shippingData = {
-      fullName: formData.fullName,
-      phone: formData.phone,
-      address: formData.address,
-      city: formData.city,
-      zipCode: formData.zipCode,
-      country: formData.country,
-    };
-
-    const verificationData = {
-      id: orderData?.id,
-      status: orderData?.status,
-      amount: orderData?.purchase_units?.[0]?.amount?.value,
-      captureId:
-        orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null,
-      timestamp: new Date().toISOString(),
-    };
-
-    const itemsData = (Array.isArray(cartItems) ? cartItems : []).map(
-      (item) => ({
-        id: item.id ?? item.$id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        size: item.selectedSize,
-        variation: item.selectedVariation?.name,
-        sku: item.selectedVariation?.sku,
-      })
-    );
-
-    const response = await appwriteDatabases.createDocument(
-      APPWRITE_DATABASE_ID,
-      APPWRITE_COLLECTION_ID,
-      ID.unique(),
-      {
-        orderId: Math.floor(Math.random() * 1000000),
-        customerId: Math.floor(Math.random() * 1000000),
-        orderDate: new Date().toISOString(),
-        totalAmount: subtotalAmount,
-        shippingAddress: `${formData.address}, ${formData.city}, ${formData.zipCode}`,
-        billingAddress: `${formData.address}, ${formData.city}, ${formData.zipCode}`,
-        orderStatus: "completed",
-        userId: appwriteUserId || formData.email,
-        amount: Math.floor(finalAmt),
-        currency: "USD",
-        paypal_order_id: orderData?.id,
-        paypal_payment_id:
-          orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null,
-        status: orderData?.status,
-        amountPaise: Math.floor(finalAmt * 100),
-        items_json: JSON.stringify(itemsData).substring(0, 999),
-        verification_raw: JSON.stringify(verificationData).substring(0, 999),
-        payment_method: "paypal",
-        shipping_full_name: formData.fullName,
-        shipping_phone: formData.phone,
-        shipping_line_1: formData.address,
-        shipping_city: formData.city,
-        shipping_postal_code: parseInt(formData.zipCode) || 0,
-        order_id: orderData?.id,
-        shipping_country: formData.country,
-        shipping: JSON.stringify(shippingData).substring(0, 999),
-        items: JSON.stringify(itemsData).substring(0, 999),
-        shipping_json: JSON.stringify(shippingData).substring(0, 999),
-        amount_formatted: Math.floor(finalAmt * 100),
-        paypal_capture_id:
-          orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null,
-        paypal_status: orderData?.status,
-      }
-    );
-
-    return response;
-  } catch (error) {
-    console.error("Appwrite error:", error);
-    throw error;
-  }
-};
 
 const CheckoutPage = () => {
   const location = useLocation();

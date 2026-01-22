@@ -36,6 +36,7 @@ import OrderDetail from "./pages/OrderDetail.jsx";
 import AdminOrders from "./pages/AdminOrders.jsx";
 import AdminReviewPanel from "./pages/AdminReviews.jsx";
 import { loadGtag } from "./lib/analytics.js";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 const router = createBrowserRouter([
   {
@@ -178,14 +179,22 @@ const router = createBrowserRouter([
   },
 ]);
 
-loadGtag();
+// Load analytics asynchronously to prevent blocking
+try {
+  loadGtag();
+} catch (error) {
+  console.warn("Failed to load analytics:", error);
+  // Continue anyway - analytics failure shouldn't block the app
+}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <CartProvider>
-        <RouterProvider router={router} />
-      </CartProvider>
-    </Provider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <CartProvider>
+          <RouterProvider router={router} />
+        </CartProvider>
+      </Provider>
+    </ErrorBoundary>
   </React.StrictMode>
 );

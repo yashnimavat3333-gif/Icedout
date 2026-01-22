@@ -37,9 +37,9 @@ const PayPalPayment = ({
   // payment method
   const [paymentMethod, setPaymentMethod] = useState("paypal");
 
-  // Appwrite setup
+  // Appwrite setup - use consistent environment variable names
   const client = new Client()
-    .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT)
+    .setEndpoint(import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1")
     .setProject(import.meta.env.VITE_APPWRITE_PROJECT_ID);
   const functions = new AppwriteFunctions(client);
   const account = new Account(client);
