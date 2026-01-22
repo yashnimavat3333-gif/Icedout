@@ -12,8 +12,11 @@ function App() {
   const dispatch = useDispatch();
 
 
+  // Optimized scroll - only scroll on initial load, not on every loading change
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (loading) return;
+    // Use instant scroll to prevent performance issues
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, [loading]);
 
   // ✅ Handle login/logout with timeout and error handling
@@ -24,7 +27,9 @@ function App() {
     // Set a maximum timeout to prevent indefinite loading
     timeoutId = setTimeout(() => {
       if (mounted) {
-        console.warn("Auth check timeout - proceeding without user data");
+        if (import.meta.env.DEV) {
+          console.warn("Auth check timeout - proceeding without user data");
+        }
         setLoading(false);
       }
     }, 5000); // 5 second timeout
@@ -45,7 +50,9 @@ function App() {
       .catch((error) => {
         if (!mounted) return;
         clearTimeout(timeoutId);
-        console.error("Auth check failed:", error);
+        if (import.meta.env.DEV) {
+          console.error("Auth check failed:", error);
+        }
         // Continue without user data - don't block the app
         dispatch(logout());
         setLoading(false);

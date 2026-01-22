@@ -75,10 +75,11 @@
 
   <!-- Defer non-critical scripts to prevent render blocking -->
   <script>
-    // Load Google Analytics asynchronously after page load
-    window.addEventListener('load', function() {
+    // Load Google Analytics with requestIdleCallback to prevent blocking
+    function loadAnalytics() {
       const script = document.createElement('script');
       script.async = true;
+      script.defer = true;
       script.src = 'https://www.googletagmanager.com/gtag/js?id=G-X03NVF8TXL';
       document.head.appendChild(script);
       
@@ -89,16 +90,24 @@
         gtag('js', new Date());
         gtag('config', 'G-X03NVF8TXL', { send_page_view: false });
       };
-    });
+    }
+    
+    // Use requestIdleCallback if available, otherwise wait for load event
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(loadAnalytics, { timeout: 2000 });
+    } else {
+      window.addEventListener('load', loadAnalytics);
+    }
   </script>
 
-  <!-- EmailJS - Load asynchronously -->
+  <!-- EmailJS - Load asynchronously with requestIdleCallback -->
   <script>
-    window.addEventListener('load', function() {
+    function loadEmailJS() {
       const emailScript = document.createElement('script');
       emailScript.type = 'text/javascript';
       emailScript.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
       emailScript.async = true;
+      emailScript.defer = true;
       emailScript.onload = function() {
         if (window.emailjs) {
           emailjs.init({
@@ -107,7 +116,14 @@
         }
       };
       document.head.appendChild(emailScript);
-    });
+    }
+    
+    // Use requestIdleCallback if available, otherwise wait for load event
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(loadEmailJS, { timeout: 3000 });
+    } else {
+      window.addEventListener('load', loadEmailJS);
+    }
   </script>
 </head>
 

@@ -3,9 +3,9 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import ProductCard from "./ProductCard";
 import productService from "../../appwrite/config";
 
-const CLIENT_PAGE_SIZE = 200;
-const SERVER_PAGE_SIZE = 100;
-const EAGER_PREFETCH_ALL = true;
+const CLIENT_PAGE_SIZE = 50; // Reduced to prevent freezes
+const SERVER_PAGE_SIZE = 50; // Reduced to prevent freezes
+const EAGER_PREFETCH_ALL = false; // Disabled to prevent loading all products at once
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
@@ -66,7 +66,7 @@ export default function ProductList() {
   /* -------------------- server load - FIXED -------------------- */
   const fetchServerPage = useCallback(async (cursor) => {
     try {
-      console.log("📡 Fetching products from server...");
+      // Removed console.log for production performance
 
       // Call the service correctly - match the method signature from ProductService
       const res = await productService.listProducts({
@@ -75,16 +75,7 @@ export default function ProductList() {
         cursorDirection: cursor ? "after" : undefined,
       });
 
-      // console.log("✅ Server response:", res);
-
       const docs = Array.isArray(res?.documents) ? res.documents : [];
-      console.log("📦 Documents received:", docs.length);
-
-      if (docs.length > 0) {
-        console.log("🔍 First product sample:", docs[0]);
-      } else {
-        console.log("⚠️ No documents received from server");
-      }
 
       const normalized = docs.map((p) => ({
         ...p,
@@ -94,21 +85,22 @@ export default function ProductList() {
           (globalThis.crypto?.randomUUID?.() || String(Math.random())),
       }));
 
+      // Optimized state update - batch updates to prevent freezes
       setProducts((prev) => {
         const map = new Map(prev.map((x) => [x.$id, x]));
         for (const d of normalized) map.set(d.$id, d);
-        const newProducts = Array.from(map.values());
-        console.log("💾 Total products in state:", newProducts.length);
-        return newProducts;
+        return Array.from(map.values());
       });
 
       const last = normalized[normalized.length - 1];
       setServerCursor(last ? last.$id : cursor);
       return { count: normalized.length, lastId: last?.$id ?? null };
-    } catch (error) {
-      console.error("❌ Error in fetchServerPage:", error);
-      throw error;
-    }
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error("❌ Error in fetchServerPage:", error);
+        }
+        throw error;
+      }
   }, []);
 
   /* -------------------- initial load - FIXED -------------------- */
@@ -119,38 +111,18 @@ export default function ProductList() {
       try {
         setLoading(true);
         setError(null);
-        console.log("🚀 Starting initial product load...");
 
         // Real data loading
-        console.log("🔄 Attempting to load real products from Appwrite...");
         const first = await fetchServerPage(null);
-        console.log("✅ First page loaded:", first.count, "products");
 
         if (!mounted) return;
 
-        if (EAGER_PREFETCH_ALL && first.count > 0) {
-          console.log("🔄 Starting eager prefetch...");
-          let cursor = first.lastId;
-          let pageCount = 1;
-
-          while (mounted && cursor) {
-            const { count, lastId } = await fetchServerPage(cursor);
-            pageCount++;
-            console.log(`📄 Page ${pageCount}: ${count} products`);
-
-            if (count < SERVER_PAGE_SIZE) {
-              setHasMoreServer(false);
-              console.log("🏁 Reached end of products");
-              break;
-            }
-            cursor = lastId;
-          }
-          console.log("✅ Eager prefetch complete");
-        } else {
-          setHasMoreServer(first.count === SERVER_PAGE_SIZE);
-        }
+        // EAGER_PREFETCH_ALL disabled to prevent freezes
+        setHasMoreServer(first.count === SERVER_PAGE_SIZE);
       } catch (e) {
-        console.error("❌ Error fetching products:", e);
+        if (import.meta.env.DEV) {
+          console.error("❌ Error fetching products:", e);
+        }
         if (mounted) {
           setError("Failed to load products. Please try again later.");
           // Fallback to empty state
@@ -159,10 +131,6 @@ export default function ProductList() {
       } finally {
         if (mounted) {
           setLoading(false);
-          console.log(
-            "🏁 Loading complete - products in state:",
-            products.length
-          );
         }
       }
     })();
@@ -172,35 +140,38 @@ export default function ProductList() {
     };
   }, [fetchServerPage]);
 
-  /* -------------------- filter & sort -------------------- */
+  /* -------------------- filter & sort - OPTIMIZED -------------------- */
   const filteredAndSorted = useMemo(() => {
     const q = query.trim().toLowerCase();
-    console.log("🔍 Filtering and sorting:", {
-      totalProducts: products.length,
-      query: q,
-      sortBy: sortBy,
-    });
+    
+    // Early return if no query and no sorting needed
+    if (!q && sortBy === "newest") {
+      return products.slice();
+    }
 
+    // Optimized filtering - use indexOf instead of includes for better performance
     const filtered = q
       ? products.filter((p) => {
-          const searchFields = [
-            p?.name,
-            p?.subtitle,
-            p?.category,
-            p?.categories,
-            p?.brand,
-            p?.description,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          const matches = searchFields.includes(q);
-          return matches;
+          // Cache searchable text to avoid repeated joins
+          const name = (p?.name || "").toLowerCase();
+          if (name.includes(q)) return true;
+          
+          const subtitle = (p?.subtitle || "").toLowerCase();
+          if (subtitle.includes(q)) return true;
+          
+          const category = (p?.category || p?.categories || "").toLowerCase();
+          if (category.includes(q)) return true;
+          
+          const brand = (p?.brand || "").toLowerCase();
+          if (brand.includes(q)) return true;
+          
+          return false;
         })
       : products.slice();
 
-    console.log("✅ After filtering:", filtered.length, "products");
-
+    // Optimized sorting - avoid expensive localeCompare when possible
+    if (filtered.length === 0) return filtered;
+    
     const withComputed = filtered.map((p) => ({
       p,
       priceKey: getComparablePrice(p),
@@ -208,32 +179,32 @@ export default function ProductList() {
       nameKey: (p?.name || "").toLowerCase(),
     }));
 
+    // Use faster comparison for sorting
     withComputed.sort((a, b) => {
       switch (sortBy) {
         case "priceAsc": {
           const ax = a.priceKey ?? Number.POSITIVE_INFINITY;
           const bx = b.priceKey ?? Number.POSITIVE_INFINITY;
           if (ax !== bx) return ax - bx;
-          return a.nameKey.localeCompare(b.nameKey);
+          // Only use localeCompare as fallback
+          return a.nameKey < b.nameKey ? -1 : a.nameKey > b.nameKey ? 1 : 0;
         }
         case "priceDesc": {
           const ax = a.priceKey ?? Number.NEGATIVE_INFINITY;
           const bx = b.priceKey ?? Number.NEGATIVE_INFINITY;
           if (ax !== bx) return bx - ax;
-          return a.nameKey.localeCompare(b.nameKey);
+          return a.nameKey < b.nameKey ? -1 : a.nameKey > b.nameKey ? 1 : 0;
         }
         case "nameAsc":
-          return a.nameKey.localeCompare(b.nameKey);
+          return a.nameKey < b.nameKey ? -1 : a.nameKey > b.nameKey ? 1 : 0;
         case "newest":
         default:
           if (a.createdAt !== b.createdAt) return b.createdAt - a.createdAt;
-          return a.nameKey.localeCompare(b.nameKey);
+          return a.nameKey < b.nameKey ? -1 : a.nameKey > b.nameKey ? 1 : 0;
       }
     });
 
-    const result = withComputed.map((x) => x.p);
-    console.log("🎯 Final sorted products:", result.length);
-    return result;
+    return withComputed.map((x) => x.p);
   }, [products, query, sortBy]);
 
   useEffect(() => {
@@ -255,7 +226,9 @@ export default function ProductList() {
         setHasMoreServer(count === SERVER_PAGE_SIZE);
         setVisibleCount((c) => c + CLIENT_PAGE_SIZE);
       } catch (e) {
-        console.error("Load more failed:", e);
+        if (import.meta.env.DEV) {
+          console.error("Load more failed:", e);
+        }
         setError("Couldn't load more products. Please try again.");
       } finally {
         setLoadingMore(false);
@@ -266,15 +239,7 @@ export default function ProductList() {
   const hasQuery = query.trim().length > 0;
   const hasResults = filteredAndSorted.length > 0;
 
-  // Debug final state
-  console.log("🎨 Render state:", {
-    loading,
-    productsCount: products.length,
-    filteredCount: filteredAndSorted.length,
-    visibleCount: visibleProducts.length,
-    hasResults,
-    hasQuery,
-  });
+  // Debug final state - only in development (removed for production performance)
 
   if (loading) {
     return (

@@ -393,7 +393,8 @@ export default function ProductDetail() {
     };
 
     fetchProduct();
-  }, [id, safeParseVar, toProcessedMedia, isTruthy, hasVariations, isInStock]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]); // Only depend on id to prevent unnecessary re-fetches
 
   // related products
   useEffect(() => {
