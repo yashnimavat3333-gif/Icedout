@@ -6,12 +6,22 @@ import { login, logout } from "./store/authSlice";
 import { Footer, Header } from "./components";
 import { Outlet } from "react-router-dom";
 import { ReactLenis } from "lenis/react";
-import gsap from "gsap";
 
 function App() {
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(false);
   const dispatch = useDispatch();
   const lenisRef = useRef();
+
+  // Detect mobile on mount
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // // ✅ Sync Lenis with GSAP properly
   // useEffect(() => {
@@ -79,19 +89,32 @@ function App() {
     );
   }
 
+  const content = (
+    <div className="min-h-screen flex flex-col justify-between">
+      <Header />
+      <main className="bg-white min-h-screen">
+        <Outlet />
+      </main>
+      <Footer />
+    </div>
+  );
+
+  // Disable Lenis smooth scroll on mobile to prevent freezes on iPhones
+  if (isMobile) {
+    return content;
+  }
+
   return (
     <ReactLenis
       root
-      // ref={lenisRef}
-      // options={{ duration: 1.2, smoothTouch: true }}
+      options={{ 
+        duration: 1.2, 
+        smoothTouch: false, // Disable on touch devices
+        smoothWheel: true,
+        wheelMultiplier: 0.8
+      }}
     >
-      <div className="min-h-screen flex flex-col justify-between">
-        <Header />
-        <main className="bg-white min-h-screen">
-          <Outlet />
-        </main>
-        <Footer />
-      </div>
+      {content}
     </ReactLenis>
   );
 }

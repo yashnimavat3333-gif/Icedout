@@ -3,7 +3,6 @@ import { useRef, useState, useEffect } from "react";
 import { Client, Databases, Query } from "appwrite";
 import conf from "../conf/conf";
 import ProductCard from "./products/ProductCard";
-import ReactLenis from "lenis/react";
 
 const PAGE_SIZE = 50; // Appwrite’s max per request
 
@@ -106,8 +105,7 @@ const MostLovedWatches = () => {
   }
 
   return (
-    <ReactLenis root>
-      <section className="py-16 bg-neutral-50">
+    <section className="py-16 bg-neutral-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-center mb-12">
@@ -183,7 +181,6 @@ const MostLovedWatches = () => {
           </div>
         </div>
       </section>
-    </ReactLenis>
   );
 };
 

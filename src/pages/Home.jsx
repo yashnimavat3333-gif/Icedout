@@ -1,10 +1,9 @@
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 import ImageCarousel from "../components/ImageCarousel";
 
 // Lazy load components below the fold for better initial load performance
 const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
 const ShopByCategory = lazy(() => import("../components/ShopByCategory"));
-const MostLovedWatches = lazy(() => import("../components/MostLovedWatches"));
 
 // Loading placeholder component
 const SectionLoader = () => (
@@ -16,26 +15,55 @@ const SectionLoader = () => (
   </div>
 );
 
+// Intersection Observer wrapper to load components only when visible
+const LazySection = ({ children, fallback }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '100px' } // Start loading 100px before visible
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref}>
+      {isVisible ? children : fallback}
+    </div>
+  );
+};
+
 function Home() {
   return (
     <div className="w-full min-h-screen bg-white">
       {/* Hero / Video - Load immediately (above fold) */}
       <ImageCarousel />
   
-      {/* ⭐ Trusted Reviews (NEW) - Lazy load */}
-      <Suspense fallback={<SectionLoader />}>
-        <TrustedReviews />
-      </Suspense>
+      {/* ⭐ Trusted Reviews (NEW) - Lazy load with Intersection Observer */}
+      <LazySection fallback={<SectionLoader />}>
+        <Suspense fallback={<SectionLoader />}>
+          <TrustedReviews />
+        </Suspense>
+      </LazySection>
   
-      {/* Categories - Lazy load */}
-      <Suspense fallback={<SectionLoader />}>
-        <ShopByCategory />
-      </Suspense>
-  
-      {/* Most Loved - Lazy load */}
-      <Suspense fallback={<SectionLoader />}>
-        <MostLovedWatches />
-      </Suspense>
+      {/* Categories - Lazy load with Intersection Observer */}
+      <LazySection fallback={<SectionLoader />}>
+        <Suspense fallback={<SectionLoader />}>
+          <ShopByCategory />
+        </Suspense>
+      </LazySection>
     </div>
   );
 }
