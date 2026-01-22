@@ -24,7 +24,7 @@ import About from "./pages/About.jsx";
 import Contact from "./pages/Contact.jsx";
 import CartPage from "./pages/CartPage.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
-import SearchResults from "./components/SearchBar.jsx";
+import SearchResults from "./components/SearchResults.jsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
 import CreateCategoryForm from "./pages/CreateCategoryForm.jsx";
 import AdminProductPanel from "./components/Admin/AdminProductPanel.jsx";
