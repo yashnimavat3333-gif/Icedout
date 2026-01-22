@@ -385,8 +385,12 @@ export default function Review({ productId }) {
                     <img
                       key={fid}
                       src={src}
-                      alt="review"
+                      alt="Customer review image"
+                      width="96"
+                      height="96"
                       className="w-24 h-24 object-cover rounded"
+                      loading="lazy"
+                      decoding="async"
                     />
                   );
                 })}

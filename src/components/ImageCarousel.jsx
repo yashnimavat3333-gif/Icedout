@@ -13,6 +13,10 @@ const ImageCarousel = () => {
           muted
           loop
           playsInline
+          preload="metadata"
+          loading="lazy"
+          width="1920"
+          height="700"
           onError={(e) => {
             console.warn("Video failed to load, showing fallback");
             e.target.style.display = "none";
@@ -30,6 +34,7 @@ const ImageCarousel = () => {
           <button
             onClick={() => navigate("/categories")}
             className="px-6 py-3 bg-white text-gray-900 rounded-md hover:bg-gray-100 transition-colors font-medium"
+            aria-label="Explore our watch collection"
           >
             Explore Collection
           </button>

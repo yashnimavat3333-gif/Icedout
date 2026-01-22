@@ -1,41 +1,41 @@
-import TrustedReviews from "../components/TrustedReviews";
-import React, { useEffect, useState } from "react";
-import appwriteService from "../appwrite/config";
-import {
-  Container,
-  // ProductCard
-} from "../components";
+import React, { lazy, Suspense } from "react";
 import ImageCarousel from "../components/ImageCarousel";
-import ShopByCategory from "../components/ShopByCategory";
-import MostLovedWatches from "../components/MostLovedWatches";
-import ProductsByCategory from "./ProductsByCategory";
+
+// Lazy load components below the fold for better initial load performance
+const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
+const ShopByCategory = lazy(() => import("../components/ShopByCategory"));
+const MostLovedWatches = lazy(() => import("../components/MostLovedWatches"));
+
+// Loading placeholder component
+const SectionLoader = () => (
+  <div className="w-full py-16 bg-white flex items-center justify-center">
+    <div className="animate-pulse">
+      <div className="h-8 w-64 bg-gray-200 rounded mb-4"></div>
+      <div className="h-4 w-48 bg-gray-200 rounded"></div>
+    </div>
+  </div>
+);
 
 function Home() {
-  const [products, setProducts] = useState([]);
-
-  // useEffect(() => {
-  //   appwriteService.getPosts().then((response) => {
-  //     if (response && response.documents) {
-  //       setProducts(response.documents);
-  //     }
-  //   });
-  // }, []);
-
   return (
     <div className="w-full min-h-screen bg-white">
-  
-      {/* Hero / Video */}
+      {/* Hero / Video - Load immediately (above fold) */}
       <ImageCarousel />
   
-      {/* ⭐ Trusted Reviews (NEW) */}
-      <TrustedReviews />
+      {/* ⭐ Trusted Reviews (NEW) - Lazy load */}
+      <Suspense fallback={<SectionLoader />}>
+        <TrustedReviews />
+      </Suspense>
   
-      {/* Categories */}
-      <ShopByCategory />
+      {/* Categories - Lazy load */}
+      <Suspense fallback={<SectionLoader />}>
+        <ShopByCategory />
+      </Suspense>
   
-      {/* Most Loved */}
-      <MostLovedWatches />
-  
+      {/* Most Loved - Lazy load */}
+      <Suspense fallback={<SectionLoader />}>
+        <MostLovedWatches />
+      </Suspense>
     </div>
   );
 }

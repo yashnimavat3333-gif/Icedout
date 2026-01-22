@@ -8,6 +8,19 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-appwrite': ['appwrite'],
+          'vendor-ui': ['@paypal/react-paypal-js', 'lucide-react'],
+        },
+      },
+    },
+    sourcemap: true, // Add source maps for debugging
+    chunkSizeWarningLimit: 1000,
+  },
   server: {
     port: 5173,
     proxy: {
@@ -19,5 +32,4 @@ export default defineConfig({
       }
     }
   }
-  // No build options needed - Vite uses sensible defaults
 })

@@ -213,7 +213,11 @@ const ProductCard = ({ product }) => {
       onClick={() => navigate(`/product/${productId}`)}
       className="cursor-pointer group rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
     >
-      <Link to={`/product/${productId}`} className="block w-full h-full">
+      <Link 
+        to={`/product/${productId}`} 
+        className="block w-full h-full"
+        aria-label={`View ${product?.name || "product"} details`}
+      >
         {/* Image */}
         <div className="relative aspect-[2/3] bg-gray-100 overflow-hidden">
           {!loaded && (
@@ -223,9 +227,13 @@ const ProductCard = ({ product }) => {
           <img
             src={imageSrc}
             alt={product?.name || "Product image"}
+            width="400"
+            height="600"
             className={`h-full w-full object-cover transition-opacity duration-300 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
+            loading="lazy"
+            decoding="async"
             onLoad={() => setLoaded(true)}
             onError={() => {
               setImgError(true);
@@ -241,6 +249,7 @@ const ProductCard = ({ product }) => {
                 e.preventDefault();
                 navigate(`/product/${productId}`);
               }}
+              aria-label={`Buy ${product?.name || "product"} now`}
             >
               Buy Now
             </button>

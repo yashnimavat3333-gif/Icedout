@@ -185,8 +185,12 @@ const ShopByCategory = () => {
                     <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
                       <img
                         src={cat.image || "/fallback.jpg"}
-                        alt={`${cat.name}`}
+                        alt={`${cat.name} category`}
+                        width="400"
+                        height="500"
                         className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        loading="lazy"
+                        decoding="async"
                       />
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />
@@ -223,13 +227,18 @@ const ShopByCategory = () => {
                       cat.name.toLowerCase()
                     )}`}
                     className="group relative block rounded-2xl overflow-hidden transition-all hover:-translate-y-2 hover:shadow-xl"
+                    aria-label={`Browse ${cat.name} category`}
                   >
                     <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
                       {cat.image && (
                         <img
                           src={cat.image}
-                          alt={`${cat.name}`}
+                          alt={`${cat.name} category`}
+                          width="400"
+                          height="500"
                           className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          loading="lazy"
+                          decoding="async"
                         />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />
