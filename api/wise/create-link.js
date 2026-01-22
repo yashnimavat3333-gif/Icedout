@@ -71,15 +71,31 @@ export default async function handler(req, res) {
     }
 
     // Prepare Wise Payment Links API request
-    // Wise API endpoint: https://api.wise.com/v1/payment-links
+    // Try multiple endpoint variations as Wise API may vary by region/account type
+    // Primary: https://api.wise.com/v1/payment-links
+    // Alternative: https://api.wise.com/v2/payment-links
+    // Alternative: https://api.transferwise.com/v1/payment-links
     const wiseApiUrl = 'https://api.wise.com/v1/payment-links';
     const redirectUrl = 'https://iceyout.com/thank-you';
 
-    // Wise API request body format
-    // profileId should be the membership number (starts with "P")
-    // amount.value can be a number (Wise API accepts decimal values)
+    // Wise API request body format - try both profileId and profile field names
+    // Some Wise API versions use 'profile' instead of 'profileId'
+    // Amount should be a number (decimal format)
     const requestBody = {
       profileId: membershipNumber,
+      amount: {
+        value: amount,
+        currency: 'USD'
+      },
+      redirectUrl: redirectUrl,
+      metadata: {
+        orderId: orderId
+      }
+    };
+
+    // Alternative request body format (if profileId doesn't work)
+    const requestBodyAlternative = {
+      profile: membershipNumber,
       amount: {
         value: amount,
         currency: 'USD'
@@ -103,8 +119,8 @@ export default async function handler(req, res) {
       redirectUrl: redirectUrl
     });
 
-    // Call Wise API
-    const response = await fetch(wiseApiUrl, {
+    // Call Wise API - try primary format first
+    let response = await fetch(wiseApiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
@@ -113,6 +129,22 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify(requestBody)
     });
+
+    // If 404, try alternative format with 'profile' instead of 'profileId'
+    if (response.status === 404) {
+      console.log('Primary request returned 404, trying alternative format with "profile" field...');
+      
+      // Try with 'profile' instead of 'profileId'
+      response = await fetch(wiseApiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBodyAlternative)
+      });
+    }
 
     // Handle Wise API response
     if (!response.ok) {
@@ -128,12 +160,10 @@ export default async function handler(req, res) {
       }
       
       // Log full Wise API error details (server-side only)
-      // Note: These are response headers from Wise, not our request headers (which contain the token)
       let responseHeaders = {};
       try {
         responseHeaders = Object.fromEntries(response.headers.entries());
       } catch (e) {
-        // Fallback if headers can't be read
         responseHeaders = { error: 'Could not read headers' };
       }
       
@@ -160,10 +190,20 @@ export default async function handler(req, res) {
         errorMessage = errorBody.message || 
                       errorBody.error?.message || 
                       errorBody.error || 
+                      (errorBody.errors && Array.isArray(errorBody.errors) ? errorBody.errors[0]?.message : null) ||
                       errorMessage;
       } else if (typeof errorBody === 'string' && errorBody.trim()) {
         // Use error text if it's a meaningful string
         errorMessage = errorBody;
+      }
+
+      // Provide more specific error message for common issues
+      if (response.status === 404) {
+        errorMessage = 'Payment link endpoint not found. Please verify your Wise account has Payment Links enabled and the API endpoint is correct.';
+      } else if (response.status === 401 || response.status === 403) {
+        errorMessage = 'Authentication failed. Please verify your Wise API token and membership number are correct.';
+      } else if (response.status === 400) {
+        errorMessage = errorMessage || 'Invalid request. Please check the amount and order ID format.';
       }
       
       return res.status(response.status || 500).json({ 
