@@ -7,6 +7,9 @@
  * Returns: { paymentUrl: string }
  * 
  * Uses process.env.WISE_API_TOKEN and process.env.WISE_PROFILE_ID (set in Vercel dashboard)
+ * 
+ * Note: This function runs in Node.js environment (Vercel serverless)
+ * Uses Node.js global fetch (available in Node.js 18+)
  */
 
 export default async function handler(req, res) {
