@@ -25,9 +25,16 @@ const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; 
 const ThumbMedia = React.memo(({ src, alt }) => {
   const [loaded, setLoaded] = useState(false);
 
+  // Validate src - must be non-empty string
+  const hasValidSrc = src && 
+    typeof src === "string" && 
+    src.trim() !== "" && 
+    src !== "undefined" && 
+    src !== "null";
+
   return (
     <div className="w-full h-full rounded-md overflow-hidden bg-gray-100">
-      {src && (
+      {hasValidSrc ? (
         <img
           src={src}
           alt={alt}
@@ -51,9 +58,7 @@ const ThumbMedia = React.memo(({ src, alt }) => {
           referrerPolicy="no-referrer"
           sizes="80px"
         />
-      )}
-
-      {!src && (
+      ) : (
         <div className="w-full h-full bg-gray-100 flex items-center justify-center">
           <div className="w-7 h-7 rounded-md border-2 border-gray-400 flex items-center justify-center">
             <div className="w-3 h-3 bg-gray-400 rounded-sm" />
@@ -79,13 +84,20 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = fa
   const fetchPriority = isFirst ? "high" : "auto";
   const decodingStrategy = isFirst ? "sync" : "async";
 
+  // Validate media URL - must be non-empty string
+  const hasValidMedia = media?.view && 
+    typeof media.view === "string" && 
+    media.view.trim() !== "" && 
+    media.view !== "undefined" && 
+    media.view !== "null";
+
   return (
     <div
       className="h-full w-full flex items-center justify-center p-0 cursor-zoom-in"
       onDoubleClick={handleOpen}
       onClick={handleOpen}
     >
-      {media?.view && (
+      {hasValidMedia ? (
         <img
           src={media.view}
           alt={name || "Product media"}
@@ -109,12 +121,10 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = fa
           }}
           sizes="(max-width: 1024px) 100vw, 50vw"
         />
-      )}
-
-      {!media?.view && (
+      ) : (
         <img
           src={placeholder}
-          alt="No media"
+          alt="No media available"
           className="w-full h-full object-cover"
           onLoad={() => setLoaded(true)}
           loading={loadingStrategy}
@@ -280,21 +290,60 @@ export default function ProductDetail() {
     [getActiveVariation]
   );
 
-  // media processing (Images Only - filters out videos)
+  // media processing (Images Only - filters out videos and invalid entries)
   const toProcessedMedia = useCallback(
-    (images = []) =>
-      images
+    (images = []) => {
+      if (!Array.isArray(images) || images.length === 0) {
+        return [];
+      }
+
+      const processed = images
         .map((fileId) => {
-          const view = productService.getFileView(fileId);
-          const norm = (u) =>
-            typeof u === "string" ? u : u?.href || u?.toString() || "";
-          const viewUrl = norm(view);
-          // Filter out video files by checking URL extension
-          const isVideo = viewUrl.match(/\.(mp4|webm|ogg|mov|avi)(\?|$)/i);
-          if (isVideo) return null;
-          return { fileId, view: viewUrl };
+          // Skip invalid file IDs
+          if (!fileId || typeof fileId !== "string" || fileId.trim() === "") {
+            return null;
+          }
+
+          try {
+            const view = productService.getFileView(fileId);
+            const norm = (u) =>
+              typeof u === "string" ? u : u?.href || u?.toString() || "";
+            const viewUrl = norm(view);
+
+            // Skip empty or invalid URLs
+            if (!viewUrl || viewUrl.trim() === "" || viewUrl === "undefined" || viewUrl === "null") {
+              return null;
+            }
+
+            // Filter out video files by checking URL extension and common video patterns
+            // Appwrite URLs might have extensions or video indicators in query params
+            const hasVideoExtension = /\.(mp4|webm|ogg|mov|avi|mkv|flv|wmv|m4v)(\?|$)/i.test(viewUrl);
+            const hasVideoMimeType = /video\//i.test(viewUrl) || /mimeType=video/i.test(viewUrl);
+            const hasVideoIndicator = /\/video\//i.test(viewUrl) || /type=video/i.test(viewUrl);
+            
+            if (hasVideoExtension || hasVideoMimeType || hasVideoIndicator) {
+              return null;
+            }
+
+            // Ensure URL is valid (starts with http/https or is a valid path)
+            const isValidUrl = /^(https?:\/\/|\/)/.test(viewUrl);
+            if (!isValidUrl) {
+              return null;
+            }
+
+            return { fileId: fileId.trim(), view: viewUrl };
+          } catch (error) {
+            // Skip entries that cause errors
+            console.debug("Skipping invalid media entry:", fileId, error);
+            return null;
+          }
         })
-        .filter(Boolean), // Remove null entries
+        .filter(Boolean); // Remove null entries
+
+      // Ensure we always have at least one valid image, or return empty array
+      // (empty array will trigger placeholder fallback in render)
+      return processed;
+    },
     []
   );
 
@@ -322,14 +371,27 @@ export default function ProductDetail() {
           }));
 
         const processedMedia = toProcessedMedia(doc.images || []);
+        
+        // Validate processedMedia - ensure it's a non-empty array
+        const validMedia = Array.isArray(processedMedia) && processedMedia.length > 0 
+          ? processedMedia 
+          : [];
+        
         const fullDoc = {
           ...doc,
           useVariations: isTruthy(doc.useVariations),
           variations: parsedVars,
-          processedMedia,
+          processedMedia: validMedia,
         };
 
         setProduct(fullDoc);
+        
+        // Reset selectedImage if it's out of bounds or if media is empty
+        if (validMedia.length === 0) {
+          setSelectedImage(0);
+        } else if (selectedImage >= validMedia.length) {
+          setSelectedImage(0);
+        }
 
         if (hasVariations(fullDoc)) {
           const firstInStock = (fullDoc.variations || []).findIndex(isInStock);
@@ -382,6 +444,12 @@ export default function ProductDetail() {
 
   const handleThumbnailClick = useCallback(
     (index) => {
+      // Validate index is within bounds
+      const mediaLength = product?.processedMedia?.length || 0;
+      if (mediaLength === 0 || index < 0 || index >= mediaLength) {
+        return;
+      }
+      
       setSelectedImage(index);
       if (mainSwiper && typeof mainSwiper.slideTo === "function") {
         try {
@@ -391,7 +459,7 @@ export default function ProductDetail() {
         }
       }
     },
-    [mainSwiper]
+    [mainSwiper, product]
   );
 
 
@@ -547,17 +615,32 @@ export default function ProductDetail() {
 
   // navigation functions for prev/next buttons and keyboard
   const goPrev = useCallback(() => {
+    const len = product?.processedMedia?.length || 0;
+    if (len === 0) return; // No media to navigate
+    
     if (mainSwiper && typeof mainSwiper.slidePrev === "function") {
-      mainSwiper.slidePrev();
+      try {
+        mainSwiper.slidePrev();
+      } catch (e) {
+        console.warn("mainSwiper.slidePrev failed", e);
+        setSelectedImage((i) => Math.max(0, i - 1));
+      }
     } else {
       setSelectedImage((i) => Math.max(0, i - 1));
     }
-  }, [mainSwiper]);
+  }, [mainSwiper, product]);
 
   const goNext = useCallback(() => {
     const len = product?.processedMedia?.length || 0;
+    if (len === 0) return; // No media to navigate
+    
     if (mainSwiper && typeof mainSwiper.slideNext === "function") {
-      mainSwiper.slideNext();
+      try {
+        mainSwiper.slideNext();
+      } catch (e) {
+        console.warn("mainSwiper.slideNext failed", e);
+        setSelectedImage((i) => Math.min(len - 1, i + 1));
+      }
     } else {
       setSelectedImage((i) => Math.min(len - 1, i + 1));
     }
@@ -1119,7 +1202,14 @@ export default function ProductDetail() {
   // ZoomContent with local fallback (Images Only)
   const ZoomContent = () => {
     const m = product?.processedMedia?.[selectedImage];
-    const url = (m && m.view) || UPLOADED_FALLBACK;
+    // Validate media URL - must be non-empty string
+    const hasValidMedia = m && 
+      m.view && 
+      typeof m.view === "string" && 
+      m.view.trim() !== "" && 
+      m.view !== "undefined" && 
+      m.view !== "null";
+    const url = hasValidMedia ? m.view : UPLOADED_FALLBACK;
 
     const commonStyle = {
       maxWidth: "none",
@@ -1159,26 +1249,30 @@ export default function ProductDetail() {
           {/* Gallery */}
           <div className="lg:w-1/2">
             <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
-              {isClient && product.processedMedia ? (
+              {isClient && product.processedMedia && product.processedMedia.length > 0 ? (
                 <>
                   {/* Prev / Next Buttons (overlay) */}
-                  <button
-                    aria-label="Previous"
-                    onClick={goPrev}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
-                    title="Previous"
-                  >
-                    <ChevronLeft className="w-5 h-5 text-gray-700" />
-                  </button>
+                  {product.processedMedia.length > 1 && (
+                    <>
+                      <button
+                        aria-label="Previous"
+                        onClick={goPrev}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
+                        title="Previous"
+                      >
+                        <ChevronLeft className="w-5 h-5 text-gray-700" />
+                      </button>
 
-                  <button
-                    aria-label="Next"
-                    onClick={goNext}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
-                    title="Next"
-                  >
-                    <ChevronRight className="w-5 h-5 text-gray-700" />
-                  </button>
+                      <button
+                        aria-label="Next"
+                        onClick={goNext}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow hover:bg-white"
+                        title="Next"
+                      >
+                        <ChevronRight className="w-5 h-5 text-gray-700" />
+                      </button>
+                    </>
+                  )}
 
                   <Swiper
                     onSwiper={(s) => {
@@ -1200,22 +1294,26 @@ export default function ProductDetail() {
                       setSelectedImage(swiper.activeIndex);
                     }}
                   >
-                    {product.processedMedia.map((m, index) => (
-                      <SwiperSlide key={m.fileId || m.view || index}>
-                        <MediaSlide
-                          media={m}
-                          name={product.name}
-                          isActive={selectedImage === index}
-                          onOpenZoom={() => openZoom()}
-                          isFirst={index === 0}
-                        />
-                      </SwiperSlide>
-                    ))}
+                    {product.processedMedia
+                      .filter((m) => m && m.view && m.view.trim() !== "") // Additional safety filter
+                      .map((m, index) => (
+                        <SwiperSlide key={m.fileId || m.view || `media-${index}`}>
+                          <MediaSlide
+                            media={m}
+                            name={product.name}
+                            isActive={selectedImage === index}
+                            onOpenZoom={() => openZoom()}
+                            isFirst={index === 0}
+                          />
+                        </SwiperSlide>
+                      ))}
                   </Swiper>
 
-                  <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs shadow-sm">
-                    {selectedImage + 1} / {product.processedMedia.length}
-                  </div>
+                  {product.processedMedia.length > 1 && (
+                    <div className="absolute bottom-4 right-4 bg-white/90 px-3 py-1 rounded-full text-xs shadow-sm">
+                      {selectedImage + 1} / {product.processedMedia.length}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="h-full w-full flex items-center justify-center" style={{ aspectRatio: '1/1' }}>
@@ -1234,27 +1332,31 @@ export default function ProductDetail() {
             </div>
 
             {/* Thumbnails */}
-            {product.processedMedia && product.processedMedia.length > 1 && (
+            {product.processedMedia && 
+             product.processedMedia.length > 1 && 
+             product.processedMedia.filter((m) => m && m.view && m.view.trim() !== "").length > 1 && (
               <div className="mt-4 flex items-center gap-2">
                 <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-                  {product.processedMedia.map((m, idx) => {
-                    const isActive = selectedImage === idx;
-                    return (
-                      <button
-                        key={m.fileId || m.view || String(idx)}
-                        onClick={() => handleThumbnailClick(idx)}
-                        className={`relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden border-2 ${
-                          isActive
-                            ? "border-gray-900"
-                            : "border-transparent hover:border-gray-300"
-                        }`}
-                        title={`thumb-${idx}`}
-                        aria-label={`Thumbnail ${idx + 1}`}
-                      >
-                        <ThumbMedia src={m.view} alt={`thumb-${idx}`} />
-                      </button>
-                    );
-                  })}
+                  {product.processedMedia
+                    .filter((m) => m && m.view && m.view.trim() !== "") // Only render valid media
+                    .map((m, idx) => {
+                      const isActive = selectedImage === idx;
+                      return (
+                        <button
+                          key={m.fileId || m.view || `thumb-${idx}`}
+                          onClick={() => handleThumbnailClick(idx)}
+                          className={`relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-md overflow-hidden border-2 ${
+                            isActive
+                              ? "border-gray-900"
+                              : "border-transparent hover:border-gray-300"
+                          }`}
+                          title={`thumb-${idx}`}
+                          aria-label={`Thumbnail ${idx + 1}`}
+                        >
+                          <ThumbMedia src={m.view} alt={`thumb-${idx}`} />
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
             )}
