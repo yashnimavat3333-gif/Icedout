@@ -21,68 +21,13 @@ import ProductReviews from "../Review";
 
 const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
 
-// ---------- Optimized Thumbnail ----------
+// ---------- Optimized Thumbnail (Images Only) ----------
 const ThumbMedia = React.memo(({ src, alt }) => {
-  const [mode, setMode] = useState("video");
   const [loaded, setLoaded] = useState(false);
-  const videoRef = useRef(null);
-
-  // Optimized video visibility handling - throttled to prevent performance issues
-  useEffect(() => {
-    if (mode !== "video" || !videoRef.current) return;
-    const v = videoRef.current;
-    
-    // Throttle visibility checks to prevent excessive calls
-    let visibilityTimeout;
-    const handleVisibilityChange = () => {
-      clearTimeout(visibilityTimeout);
-      visibilityTimeout = setTimeout(() => {
-        if (document.visibilityState === "hidden") {
-          try {
-            v.pause();
-          } catch {}
-        } else {
-          v.play().catch(() => {});
-        }
-      }, 100);
-    };
-    
-    // Only check on visibility change, not continuously
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Initial check
-    if (document.visibilityState !== "hidden") {
-      v.play().catch(() => {});
-    }
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearTimeout(visibilityTimeout);
-    };
-  }, [mode]);
 
   return (
     <div className="w-full h-full rounded-md overflow-hidden bg-gray-100">
-      {mode === "video" && src && (
-        <video
-          ref={videoRef}
-          src={src}
-          preload="auto"
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoadedData={() => setLoaded(true)}
-          onError={() => {
-            setMode("img");
-            setLoaded(false);
-          }}
-          muted
-          playsInline
-          loop
-        />
-      )}
-
-      {mode === "img" && src && (
+      {src && (
         <img
           src={src}
           alt={alt}
@@ -91,17 +36,16 @@ const ThumbMedia = React.memo(({ src, alt }) => {
           }`}
           onLoad={() => setLoaded(true)}
           onError={() => {
-            setMode("tile");
             setLoaded(true);
           }}
-          loading="eager"
-          decoding="sync"
+          loading="lazy"
+          decoding="async"
           style={{ contain: "paint", backfaceVisibility: "hidden" }}
           referrerPolicy="no-referrer"
         />
       )}
 
-      {mode === "tile" && (
+      {!src && (
         <div className="w-full h-full bg-gray-100 flex items-center justify-center">
           <div className="w-7 h-7 rounded-md border-2 border-gray-400 flex items-center justify-center">
             <div className="w-3 h-3 bg-gray-400 rounded-sm" />
@@ -113,22 +57,10 @@ const ThumbMedia = React.memo(({ src, alt }) => {
 });
 ThumbMedia.displayName = "ThumbMedia";
 
-// ---------- Optimized Main Slide ----------
+// ---------- Optimized Main Slide (Images Only) ----------
 const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
-  const [mode, setMode] = useState("video");
   const [loaded, setLoaded] = useState(false);
-  const videoRef = useRef(null);
   const placeholder = "/placeholder-product.jpg";
-
-  useEffect(() => {
-    if (mode !== "video" || !videoRef.current) return;
-
-    if (isActive) {
-      videoRef.current.play().catch(() => {});
-    } else {
-      videoRef.current.pause();
-    }
-  }, [mode, isActive]);
 
   const handleOpen = () => {
     onOpenZoom?.();
@@ -140,32 +72,7 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
       onDoubleClick={handleOpen}
       onClick={handleOpen}
     >
-      {mode === "video" && media?.view && (
-        <video
-          ref={videoRef}
-          src={media.view}
-          preload="auto"
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
-          onLoadedData={() => setLoaded(true)}
-          onError={() => {
-            setMode("img");
-            setLoaded(false);
-          }}
-          muted
-          playsInline
-          autoPlay={isActive}
-          loop
-          controls={isActive}
-          disablePictureInPicture
-          disableRemotePlayback
-          webkit-playsinline="true"
-          x5-playsinline="true"
-        />
-      )}
-
-      {mode === "img" && media?.view && (
+      {media?.view && (
         <img
           src={media.view}
           alt={name || "Product media"}
@@ -174,21 +81,20 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
           }`}
           onLoad={() => setLoaded(true)}
           onError={() => {
-            setMode("placeholder");
             setLoaded(true);
           }}
-          loading="eager"
-          decoding="sync"
+          loading="lazy"
+          decoding="async"
         />
       )}
 
-      {(mode === "placeholder" || !media?.view) && (
+      {!media?.view && (
         <img
           src={placeholder}
           alt="No media"
           className="w-full h-full object-cover"
           onLoad={() => setLoaded(true)}
-          loading="eager"
+          loading="lazy"
         />
       )}
     </div>
@@ -231,7 +137,6 @@ export default function ProductDetail() {
   });
   const lastTapRef = useRef(0);
 
-  const activeIndexRef = useRef(0);
   const { addToCart } = useCart();
   const navigate = useNavigate();
 
@@ -335,15 +240,21 @@ export default function ProductDetail() {
     [getActiveVariation]
   );
 
-  // media processing
+  // media processing (Images Only - filters out videos)
   const toProcessedMedia = useCallback(
     (images = []) =>
-      images.map((fileId) => {
-        const view = productService.getFileView(fileId);
-        const norm = (u) =>
-          typeof u === "string" ? u : u?.href || u?.toString() || "";
-        return { fileId, view: norm(view) };
-      }),
+      images
+        .map((fileId) => {
+          const view = productService.getFileView(fileId);
+          const norm = (u) =>
+            typeof u === "string" ? u : u?.href || u?.toString() || "";
+          const viewUrl = norm(view);
+          // Filter out video files by checking URL extension
+          const isVideo = viewUrl.match(/\.(mp4|webm|ogg|mov|avi)(\?|$)/i);
+          if (isVideo) return null;
+          return { fileId, view: viewUrl };
+        })
+        .filter(Boolean), // Remove null entries
     []
   );
 
@@ -443,20 +354,6 @@ export default function ProductDetail() {
     [mainSwiper]
   );
 
-  const playActiveSlideVideo = useCallback((swiper) => {
-    const activeIndex = swiper.activeIndex ?? 0;
-    activeIndexRef.current = activeIndex;
-
-    const activeSlide = swiper.slides?.[activeIndex];
-    if (!activeSlide) return;
-
-    const video = activeSlide.querySelector("video");
-    if (video) {
-      video.muted = true;
-      video.playsInline = true;
-      video.play().catch(() => {});
-    }
-  }, []);
 
   // Zoom modal handlers
   const openZoom = useCallback(() => {
@@ -1179,11 +1076,10 @@ export default function ProductDetail() {
     );
   if (!product) return null;
 
-  // ZoomContent with local fallback
+  // ZoomContent with local fallback (Images Only)
   const ZoomContent = () => {
     const m = product?.processedMedia?.[selectedImage];
     const url = (m && m.view) || UPLOADED_FALLBACK;
-    const isVideo = (url || "").match(/\.(mp4|webm|ogg)(\?|$)/i);
 
     const commonStyle = {
       maxWidth: "none",
@@ -1194,24 +1090,6 @@ export default function ProductDetail() {
       userSelect: "none",
       touchAction: "none",
     };
-
-    if (isVideo) {
-      return (
-        <video
-          src={url}
-          controls
-          autoPlay
-          playsInline
-          style={{
-            ...commonStyle,
-            cursor: zoomScale > 1 ? "grab" : "auto",
-            width: "auto",
-            height: "auto",
-            maxHeight: "100vh",
-          }}
-        />
-      );
-    }
 
     return (
       <img
@@ -1259,7 +1137,6 @@ export default function ProductDetail() {
                   <Swiper
                     onSwiper={(s) => {
                       setMainSwiper(s);
-                      playActiveSlideVideo(s);
                     }}
                     slidesPerView={1}
                     spaceBetween={10}
@@ -1270,7 +1147,6 @@ export default function ProductDetail() {
                     lazy={true}
                     onSlideChange={(swiper) => {
                       setSelectedImage(swiper.activeIndex);
-                      playActiveSlideVideo(swiper);
                     }}
                   >
                     {product.processedMedia.map((m, index) => (
