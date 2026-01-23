@@ -161,6 +161,9 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedVarIndex, setSelectedVarIndex] = useState(0);
+  
+  // Defer rendering of gallery images to prevent initial render blocking
+  const [renderAllImages, setRenderAllImages] = useState(false);
 
   // Zoom modal state (mobile-friendly)
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -406,8 +409,38 @@ export default function ProductDetail() {
     };
 
     fetchProduct();
+    // Reset deferred rendering when product changes
+    setRenderAllImages(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]); // Only depend on id to prevent unnecessary re-fetches
+
+  // Defer rendering of remaining gallery images after initial render
+  useEffect(() => {
+    if (!product || !product.processedMedia || product.processedMedia.length <= 1) {
+      return; // No need to defer if there's only one or no images
+    }
+
+    // Defer rendering of additional images after initial render completes
+    const deferImages = () => {
+      // Use requestIdleCallback for non-blocking deferral, fallback to setTimeout
+      if (window.requestIdleCallback) {
+        window.requestIdleCallback(
+          () => {
+            setRenderAllImages(true);
+          },
+          { timeout: 1500 } // Max 1.5s delay
+        );
+      } else {
+        // Fallback for browsers without requestIdleCallback
+        setTimeout(() => {
+          setRenderAllImages(true);
+        }, 100); // Small delay to allow first image to render
+      }
+    };
+
+    // Wait for first image to load, then defer the rest
+    deferImages();
+  }, [product]);
 
   // related products
   useEffect(() => {
@@ -1277,24 +1310,33 @@ export default function ProductDetail() {
                   <Swiper
                     onSwiper={(s) => {
                       setMainSwiper(s);
+                      // Update Swiper after images are deferred to render
+                      if (s && renderAllImages) {
+                        requestAnimationFrame(() => {
+                          s.update();
+                        });
+                      }
                     }}
                     slidesPerView={1}
                     spaceBetween={10}
                     className="h-full w-full"
-                    observer
-                    observeParents
+                    observer={renderAllImages} // Only observe after all images are rendered
+                    observeParents={renderAllImages}
                     preloadImages={false}
                     lazy={{
                       enabled: true,
                       loadPrevNext: true,
                       loadPrevNextAmount: 1,
                     }}
-                    watchSlidesProgress={true}
+                    watchSlidesProgress={renderAllImages} // Only watch progress after initial render
                     onSlideChange={(swiper) => {
                       setSelectedImage(swiper.activeIndex);
                     }}
                   >
-                    {product.processedMedia
+                    {(renderAllImages 
+                      ? product.processedMedia 
+                      : product.processedMedia.slice(0, 1) // Only first image initially
+                    )
                       .filter((m) => m && m.view && m.view.trim() !== "") // Additional safety filter
                       .map((m, index) => (
                         <SwiperSlide key={m.fileId || m.view || `media-${index}`}>
