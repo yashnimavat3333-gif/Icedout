@@ -19,16 +19,24 @@ export default function RelatedProducts({ relatedProducts }) {
             onClick={() => navigate(`/product/${item.$id}`)}
             className="cursor-pointer group border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
           >
-            <img
-              src={
-                item.images?.length
-                  ? productService.getImagePreview(item.images[0])
-                  : "/placeholder-product.jpg"
-              }
-              alt={item.name}
-              className="h-40 w-full object-cover group-hover:scale-105 transition-transform"
-              onError={(e) => (e.target.src = "/placeholder-product.jpg")}
-            />
+            <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
+              <img
+                src={
+                  item.images?.length
+                    ? productService.getFilePreview(item.images[0])
+                    : "/placeholder-product.jpg"
+                }
+                alt={item.name}
+                width="200"
+                height="300"
+                className="h-full w-full object-cover group-hover:scale-105 transition-transform absolute inset-0"
+                style={{ aspectRatio: '2/3' }}
+                loading="lazy"
+                decoding="async"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
+                onError={(e) => (e.target.src = "/placeholder-product.jpg")}
+              />
+            </div>
             <div className="p-3 space-y-1">
               <h3 className="text-sm font-medium text-gray-900 truncate">
                 {item.name}

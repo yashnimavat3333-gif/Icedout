@@ -42,8 +42,14 @@ const ThumbMedia = React.memo(({ src, alt }) => {
           decoding="async"
           width={80}
           height={80}
-          style={{ contain: "paint", backfaceVisibility: "hidden" }}
+          style={{ 
+            aspectRatio: '1/1',
+            contain: "layout style paint", 
+            backfaceVisibility: "hidden",
+            contentVisibility: 'auto'
+          }}
           referrerPolicy="no-referrer"
+          sizes="80px"
         />
       )}
 
@@ -95,6 +101,13 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = fa
           decoding={decodingStrategy}
           width={800}
           height={800}
+          style={{
+            aspectRatio: '1/1',
+            contain: 'layout style paint',
+            maxWidth: '100%',
+            maxHeight: '100%'
+          }}
+          sizes="(max-width: 1024px) 100vw, 50vw"
         />
       )}
 
@@ -107,6 +120,13 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = fa
           loading={loadingStrategy}
           width={800}
           height={800}
+          style={{
+            aspectRatio: '1/1',
+            contain: 'layout style paint',
+            maxWidth: '100%',
+            maxHeight: '100%'
+          }}
+          sizes="(max-width: 1024px) 100vw, 50vw"
         />
       )}
     </div>
@@ -1116,12 +1136,18 @@ export default function ProductDetail() {
         src={url}
         alt={product?.name || "Product"}
         draggable={false}
+        width={1200}
+        height={1200}
         style={{
           ...commonStyle,
           cursor: zoomScale > 1 ? "grab" : "auto",
           maxWidth: "100%",
           maxHeight: "100%",
+          aspectRatio: '1/1',
+          contain: 'layout style paint',
+          objectFit: 'contain'
         }}
+        sizes="100vw"
       />
     );
   };
@@ -1192,11 +1218,16 @@ export default function ProductDetail() {
                   </div>
                 </>
               ) : (
-                <div className="h-full w-full flex items-center justify-center">
+                <div className="h-full w-full flex items-center justify-center" style={{ aspectRatio: '1/1' }}>
                   <img
                     src={"/placeholder-product.jpg"}
                     alt={product.name || "Product"}
                     className="w-full h-full object-cover"
+                    width={800}
+                    height={800}
+                    style={{ aspectRatio: '1/1' }}
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
               )}

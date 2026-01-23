@@ -223,7 +223,7 @@ const ProductCard = ({ product, isAboveFold = false }) => {
         className="block w-full h-full"
         aria-label={`View ${product?.name || "product"} details`}
       >
-        {/* Image - Fixed aspect-ratio to prevent CLS */}
+        {/* Image - Fixed aspect-ratio to prevent CLS, optimized dimensions for memory */}
         <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
           {!loaded && (
             <div className="absolute inset-0 animate-pulse bg-gray-200" style={{ aspectRatio: '2/3' }} />
@@ -240,7 +240,12 @@ const ProductCard = ({ product, isAboveFold = false }) => {
             loading={loadingStrategy}
             fetchPriority={fetchPriority}
             decoding={decodingStrategy}
-            style={{ aspectRatio: '2/3' }}
+            style={{ 
+              aspectRatio: '2/3',
+              contain: 'layout style paint',
+              contentVisibility: 'auto'
+            }}
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             onLoad={() => setLoaded(true)}
             onError={() => {
               setImgError(true);

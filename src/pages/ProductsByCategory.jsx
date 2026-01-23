@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import productService from "../appwrite/config";
+import ProductCard from "../components/products/ProductCard";
+
+const INITIAL_PRODUCTS_PER_CATEGORY = 12; // Initial products to show per category
+const LOAD_MORE_COUNT = 12; // Products to load per "Load More" click
 
 const ProductsByCategory = () => {
   const [categories, setCategories] = useState([]);
   const [productsByCategory, setProductsByCategory] = useState({});
+  const [visibleCounts, setVisibleCounts] = useState({}); // Track visible count per category
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -84,11 +89,39 @@ const ProductsByCategory = () => {
             </div>
 
             {products.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {products.map((product) => (
-                  <ProductCard key={product.$id} product={product} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {products
+                    .slice(0, visibleCounts[categoryId] || INITIAL_PRODUCTS_PER_CATEGORY)
+                    .map((product, index) => {
+                      // First 8 products are above fold - eager load for LCP
+                      const isAboveFold = index < 8;
+                      return (
+                        <ProductCard
+                          key={product.$id}
+                          isAboveFold={isAboveFold}
+                          product={product}
+                        />
+                      );
+                    })}
+                </div>
+                {products.length > (visibleCounts[categoryId] || INITIAL_PRODUCTS_PER_CATEGORY) && (
+                  <div className="flex justify-center mt-6">
+                    <button
+                      onClick={() => {
+                        setVisibleCounts((prev) => ({
+                          ...prev,
+                          [categoryId]: (prev[categoryId] || INITIAL_PRODUCTS_PER_CATEGORY) + LOAD_MORE_COUNT,
+                        }));
+                      }}
+                      className="px-6 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 transition-colors"
+                    >
+                      Load More {categoryInfo.name} Products (
+                      {products.length - (visibleCounts[categoryId] || INITIAL_PRODUCTS_PER_CATEGORY)} remaining)
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-gray-500">No products in this category</p>
             )}
@@ -96,59 +129,6 @@ const ProductsByCategory = () => {
         )
       )}
     </div>
-  );
-};
-
-const ProductCard = ({ product }) => {
-  return (
-    <Link
-      to={`/product/${product.slug}`}
-      className="group bg-white rounded-lg shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow duration-300"
-    >
-      <div className="relative aspect-square overflow-hidden">
-        <img
-          src={product.images?.[0] || "/placeholder-product.jpg"}
-          alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
-        {product.discount > 0 && (
-          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
-            {product.discount}% OFF
-          </div>
-        )}
-      </div>
-      <div className="p-4">
-        <h3 className="font-medium text-gray-900 mb-1 truncate">
-          {product.name}
-        </h3>
-        <p className="text-gray-500 text-sm mb-2 line-clamp-2">
-          {product.description}
-        </p>
-        <div className="flex items-center justify-between">
-          <div>
-            {product.discount > 0 ? (
-              <>
-                <span className="text-lg font-bold text-gray-900">
-                  ${(product.price * (1 - product.discount / 100)).toFixed(2)}
-                </span>
-                <span className="ml-2 text-sm text-gray-500 line-through">
-                  ${product.price.toFixed(2)}
-                </span>
-              </>
-            ) : (
-              <span className="text-lg font-bold text-gray-900">
-                ${product.price.toFixed(2)}
-              </span>
-            )}
-          </div>
-          {product.stock > 0 ? (
-            <span className="text-xs text-green-600">In Stock</span>
-          ) : (
-            <span className="text-xs text-red-600">Out of Stock</span>
-          )}
-        </div>
-      </div>
-    </Link>
   );
 };
 
