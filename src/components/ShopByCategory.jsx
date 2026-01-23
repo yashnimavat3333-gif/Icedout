@@ -182,15 +182,17 @@ const ShopByCategory = () => {
                     )}`}
                     className="group relative block rounded-2xl overflow-hidden transition-all hover:-translate-y-2 hover:shadow-xl"
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+                    <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" style={{ aspectRatio: '4/5' }}>
                       <img
                         src={cat.image || "/fallback.jpg"}
                         alt={`${cat.name} category`}
                         width="400"
                         height="500"
-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
-                        loading="lazy"
-                        decoding="async"
+                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700 absolute inset-0"
+                        loading={cat.$id === categories[0]?.$id ? "eager" : "lazy"}
+                        fetchPriority={cat.$id === categories[0]?.$id ? "high" : "auto"}
+                        decoding={cat.$id === categories[0]?.$id ? "sync" : "async"}
+                        style={{ aspectRatio: '4/5' }}
                       />
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />
@@ -229,16 +231,18 @@ const ShopByCategory = () => {
                     className="group relative block rounded-2xl overflow-hidden transition-all hover:-translate-y-2 hover:shadow-xl"
                     aria-label={`Browse ${cat.name} category`}
                   >
-                    <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+                    <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" style={{ aspectRatio: '4/5' }}>
                       {cat.image && (
                         <img
                           src={cat.image}
                           alt={`${cat.name} category`}
                           width="400"
                           height="500"
-                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          loading="lazy"
-                          decoding="async"
+                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700 absolute inset-0"
+                          loading={cat.$id === categories[0]?.$id ? "eager" : "lazy"}
+                          fetchPriority={cat.$id === categories[0]?.$id ? "high" : "auto"}
+                          decoding={cat.$id === categories[0]?.$id ? "sync" : "async"}
+                          style={{ aspectRatio: '4/5' }}
                         />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />

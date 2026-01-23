@@ -170,7 +170,7 @@ function getCardPricing(product) {
   };
 }
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, isAboveFold = false }) => {
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
@@ -205,6 +205,11 @@ const ProductCard = ({ product }) => {
 
   const imageSrc = !imgError && previewUrl ? previewUrl : fallbackImg;
   const hasNumericPrice = typeof price === "number";
+  
+  // Above-the-fold images should be eager-loaded for LCP
+  const loadingStrategy = isAboveFold ? "eager" : "lazy";
+  const fetchPriority = isAboveFold ? "high" : "auto";
+  const decodingStrategy = isAboveFold ? "sync" : "async";
   {
     // console.log(product);
   }
@@ -218,10 +223,10 @@ const ProductCard = ({ product }) => {
         className="block w-full h-full"
         aria-label={`View ${product?.name || "product"} details`}
       >
-        {/* Image */}
-        <div className="relative aspect-[2/3] bg-gray-100 overflow-hidden">
+        {/* Image - Fixed aspect-ratio to prevent CLS */}
+        <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
           {!loaded && (
-            <div className="absolute inset-0 animate-pulse bg-gray-200" />
+            <div className="absolute inset-0 animate-pulse bg-gray-200" style={{ aspectRatio: '2/3' }} />
           )}
 
           <img
@@ -232,8 +237,10 @@ const ProductCard = ({ product }) => {
             className={`h-full w-full object-cover transition-opacity duration-300 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
-            loading="lazy"
-            decoding="async"
+            loading={loadingStrategy}
+            fetchPriority={fetchPriority}
+            decoding={decodingStrategy}
+            style={{ aspectRatio: '2/3' }}
             onLoad={() => setLoaded(true)}
             onError={() => {
               setImgError(true);
@@ -319,11 +326,14 @@ export default React.memo(ProductCard, (prevProps, nextProps) => {
   const nextName = nextProps.product?.name;
   const prevImages = prevProps.product?.images?.[0];
   const nextImages = nextProps.product?.images?.[0];
+  const prevAboveFold = prevProps.isAboveFold;
+  const nextAboveFold = nextProps.isAboveFold;
   
   // Re-render only if critical props changed
   return (
     prevPrice === nextPrice &&
     prevName === nextName &&
-    prevImages === nextImages
+    prevImages === nextImages &&
+    prevAboveFold === nextAboveFold
   );
 });

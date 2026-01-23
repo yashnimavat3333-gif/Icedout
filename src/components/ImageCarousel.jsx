@@ -12,17 +12,30 @@ const ImageCarousel = () => {
 
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
-      <div className="aspect-w-16 h-[20rem] aspect-h-[20rem] lg:h-[700px] relative">
+      {/* Fixed aspect-ratio container to prevent CLS - mobile: 20rem, desktop: 700px */}
+      <div 
+        className="relative w-full"
+        style={{ 
+          aspectRatio: '16/9',
+          height: '20rem',
+          minHeight: '20rem'
+        }}
+      >
+        <div 
+          className="hidden lg:block absolute inset-0" 
+          style={{ height: '700px', aspectRatio: '16/9' }} 
+        />
         {/* Hero Image - LCP Element: Optimized with explicit dimensions and fetchpriority */}
         <img
           src="/IMG_3084.JPG"
           alt="Premium Timepieces & Fine Jewellery"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover absolute inset-0"
           width={desktopWidth}
           height={desktopHeight}
           loading="eager"
           fetchPriority="high"
           decoding="sync"
+          style={{ aspectRatio: '16/9', objectFit: 'cover' }}
           onError={(e) => {
             const img = e.target;
             const currentSrc = img.src;

@@ -264,24 +264,29 @@ const CategoryPage = ({ category: propCategory }) => {
       {products.length > 0 ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {products.map((product) => (
-              <ProductCard
-                key={product.$id}
-                product={{
-                  id: product.$id,
-                  $id: product.$id,
-                  name: product.name,
-                  subtitle: product.subtitle || product.category,
-                  price: product.price,
-                  images: product.images,
-                  variations: product.variations,
-                  useVariations: product.useVariations,
-                  compareAtPrice: product.compareAtPrice,
-                  mrp: product.mrp,
-                  listPrice: product.listPrice,
-                }}
-              />
-            ))}
+            {products.map((product, index) => {
+              // First 8 products are above fold - eager load for LCP
+              const isAboveFold = index < 8;
+              return (
+                <ProductCard
+                  key={product.$id}
+                  isAboveFold={isAboveFold}
+                  product={{
+                    id: product.$id,
+                    $id: product.$id,
+                    name: product.name,
+                    subtitle: product.subtitle || product.category,
+                    price: product.price,
+                    images: product.images,
+                    variations: product.variations,
+                    useVariations: product.useVariations,
+                    compareAtPrice: product.compareAtPrice,
+                    mrp: product.mrp,
+                    listPrice: product.listPrice,
+                  }}
+                />
+              );
+            })}
           </div>
 
           {/* Infinite scroll trigger */}

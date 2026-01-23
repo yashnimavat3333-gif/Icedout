@@ -3,9 +3,10 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import ProductCard from "./ProductCard";
 import productService from "../../appwrite/config";
 
-const CLIENT_PAGE_SIZE = 50; // Reduced to prevent freezes
-const SERVER_PAGE_SIZE = 50; // Reduced to prevent freezes
+const CLIENT_PAGE_SIZE = 12; // Initial visible products (above fold)
+const SERVER_PAGE_SIZE = 16; // Products per server batch
 const EAGER_PREFETCH_ALL = false; // Disabled to prevent loading all products at once
+const ABOVE_FOLD_COUNT = 8; // First 8 products are above fold (eager load)
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
@@ -371,17 +372,14 @@ export default function ProductList() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 mb-12">
             {visibleProducts.map((product, index) => {
-              console.log(
-                `🎯 Rendering product ${index}:`,
-                product?.name || "Unnamed",
-                product
-              );
+              // First 8 products are above fold - eager load for LCP
+              const isAboveFold = index < ABOVE_FOLD_COUNT;
               return (
                 <div
                   key={product.$id}
                   className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300"
                 >
-                  <ProductCard product={product} />
+                  <ProductCard product={product} isAboveFold={isAboveFold} />
                 </div>
               );
             })}
