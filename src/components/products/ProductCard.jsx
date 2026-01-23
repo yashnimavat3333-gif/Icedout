@@ -304,4 +304,26 @@ ProductCard.propTypes = {
   }).isRequired,
 };
 
-export default ProductCard;
+// Memoize ProductCard to prevent unnecessary re-renders
+export default React.memo(ProductCard, (prevProps, nextProps) => {
+  // Only re-render if product ID or critical data changes
+  const prevId = prevProps.product?.$id || prevProps.product?.id;
+  const nextId = nextProps.product?.$id || nextProps.product?.id;
+  
+  if (prevId !== nextId) return false; // IDs differ, re-render
+  
+  // Check if critical display data changed
+  const prevPrice = prevProps.product?.price;
+  const nextPrice = nextProps.product?.price;
+  const prevName = prevProps.product?.name;
+  const nextName = nextProps.product?.name;
+  const prevImages = prevProps.product?.images?.[0];
+  const nextImages = nextProps.product?.images?.[0];
+  
+  // Re-render only if critical props changed
+  return (
+    prevPrice === nextPrice &&
+    prevName === nextName &&
+    prevImages === nextImages
+  );
+});

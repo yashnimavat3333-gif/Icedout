@@ -3,15 +3,26 @@ import { useNavigate } from "react-router-dom";
 const ImageCarousel = () => {
   const navigate = useNavigate();
 
+  // Mobile-first: Use optimized image sizes
+  // Mobile: 800px width (h-[20rem] = 320px), Desktop: 1920px width (h-[700px])
+  const mobileHeight = 320; // 20rem = 320px
+  const desktopHeight = 700;
+  const mobileWidth = Math.round((mobileHeight * 16) / 9); // ~569px for 16:9
+  const desktopWidth = Math.round((desktopHeight * 16) / 9); // ~1244px for 16:9
+
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
       <div className="aspect-w-16 h-[20rem] aspect-h-[20rem] lg:h-[700px] relative">
-        {/* Hero Image - Try local image first, then fallback to professional jewellery image */}
+        {/* Hero Image - LCP Element: Optimized with explicit dimensions and fetchpriority */}
         <img
           src="/IMG_3084.JPG"
           alt="Premium Timepieces & Fine Jewellery"
           className="w-full h-full object-cover"
+          width={desktopWidth}
+          height={desktopHeight}
           loading="eager"
+          fetchPriority="high"
+          decoding="sync"
           onError={(e) => {
             const img = e.target;
             const currentSrc = img.src;
@@ -35,8 +46,10 @@ const ImageCarousel = () => {
               img.src = '/IMG_3084.png';
             } else {
               // All local attempts failed, use professional luxury watch/jewellery image
-              // High-quality Unsplash image of luxury watches
-              img.src = 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80';
+              // Optimized Unsplash image with mobile-friendly size
+              const isMobile = window.innerWidth < 768;
+              const optimizedWidth = isMobile ? 800 : 1920;
+              img.src = `https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=${optimizedWidth}&q=75`;
               
               // Final fallback to gradient if even Unsplash fails
               img.onerror = () => {

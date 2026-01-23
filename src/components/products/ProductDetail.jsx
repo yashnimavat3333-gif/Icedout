@@ -40,6 +40,8 @@ const ThumbMedia = React.memo(({ src, alt }) => {
           }}
           loading="lazy"
           decoding="async"
+          width={80}
+          height={80}
           style={{ contain: "paint", backfaceVisibility: "hidden" }}
           referrerPolicy="no-referrer"
         />
@@ -58,13 +60,18 @@ const ThumbMedia = React.memo(({ src, alt }) => {
 ThumbMedia.displayName = "ThumbMedia";
 
 // ---------- Optimized Main Slide (Images Only) ----------
-const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
+const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = false }) => {
   const [loaded, setLoaded] = useState(false);
   const placeholder = "/placeholder-product.jpg";
 
   const handleOpen = () => {
     onOpenZoom?.();
   };
+
+  // First image is LCP element on product pages - optimize it
+  const loadingStrategy = isFirst ? "eager" : "lazy";
+  const fetchPriority = isFirst ? "high" : "auto";
+  const decodingStrategy = isFirst ? "sync" : "async";
 
   return (
     <div
@@ -83,8 +90,11 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
           onError={() => {
             setLoaded(true);
           }}
-          loading="lazy"
-          decoding="async"
+          loading={loadingStrategy}
+          fetchPriority={fetchPriority}
+          decoding={decodingStrategy}
+          width={800}
+          height={800}
         />
       )}
 
@@ -94,7 +104,9 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom }) => {
           alt="No media"
           className="w-full h-full object-cover"
           onLoad={() => setLoaded(true)}
-          loading="lazy"
+          loading={loadingStrategy}
+          width={800}
+          height={800}
         />
       )}
     </div>
@@ -141,7 +153,15 @@ export default function ProductDetail() {
   const navigate = useNavigate();
 
   useEffect(() => setIsClient(true), []);
-  useEffect(() => window.scrollTo({ top: 0, behavior: "smooth" }), [loading]);
+  // Defer scroll to prevent blocking initial render
+  useEffect(() => {
+    if (!loading) {
+      // Use requestAnimationFrame to defer scroll after paint
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
+    }
+  }, [loading]);
 
   // Ensure session (private buckets)
   useEffect(() => {
@@ -1144,7 +1164,12 @@ export default function ProductDetail() {
                     observer
                     observeParents
                     preloadImages={false}
-                    lazy={true}
+                    lazy={{
+                      enabled: true,
+                      loadPrevNext: true,
+                      loadPrevNextAmount: 1,
+                    }}
+                    watchSlidesProgress={true}
                     onSlideChange={(swiper) => {
                       setSelectedImage(swiper.activeIndex);
                     }}
@@ -1156,6 +1181,7 @@ export default function ProductDetail() {
                           name={product.name}
                           isActive={selectedImage === index}
                           onOpenZoom={() => openZoom()}
+                          isFirst={index === 0}
                         />
                       </SwiperSlide>
                     ))}
