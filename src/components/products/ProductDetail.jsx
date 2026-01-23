@@ -896,6 +896,130 @@ export default function ProductDetail() {
           ))}
         </div>
 
+        {/* Payment Reassurance Section */}
+        <div className="pt-4 pb-3 space-y-3">
+          <div className="flex items-center justify-center text-xs text-gray-600 text-center px-2">
+            <span>🔒 Buyer protection applies · Secure PayPal & card checkout</span>
+          </div>
+          <div className="flex items-center justify-center gap-3 opacity-50">
+            {/* PayPal */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-medium text-gray-400 tracking-wide">PayPal</span>
+            </div>
+            {/* Visa */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">VISA</span>
+            </div>
+            {/* Mastercard */}
+            <div className="flex items-center">
+              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">MC</span>
+            </div>
+            {/* American Express */}
+            <div className="flex items-center">
+              <span className="text-[9px] font-semibold text-gray-400 tracking-wide">AMEX</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex space-x-4 pt-2">
+          <button
+            className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
+            onClick={() => {
+              if (product.size?.length && !selectedSize) {
+                alert("Please select a size before adding to cart.");
+                return;
+              }
+              if (hasVariationsProduct && !isInStock(activeVariation)) {
+                alert("Selected variant is out of stock.");
+                return;
+              }
+              if (
+                window.confirm(
+                  "Are you sure you want to add this item to your cart?"
+                )
+              ) {
+                addToCart({
+                  ...product,
+                  pricing: getDisplayPricing(product, selectedVarIndex),
+                  selectedVariation: activeVariation,
+                  selectedSize: selectedSize || null,
+                });
+                navigate("/cart");
+              }
+            }}
+          >
+            Add to Cart
+          </button>
+
+          <button
+            className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
+            onClick={() => {
+              if (product.size?.length && !selectedSize) {
+                alert("Please select a size before buying.");
+                return;
+              }
+              if (hasVariationsProduct && !isInStock(activeVariation)) {
+                alert("Selected variant is out of stock.");
+                return;
+              }
+
+              const buyItem = {
+                $id: product.$id ?? product.id,
+                id: product.$id ?? product.id,
+                name: product.name,
+                price: (pricing?.price ?? product.price) || 0,
+                quantity: 1,
+                image:
+                  product.processedMedia?.[0]?.view ||
+                  product.thumbnail ||
+                  "/placeholder-product.jpg",
+                selectedSize: selectedSize || null,
+                selectedVariation: activeVariation || null,
+                pricing: getDisplayPricing(product, selectedVarIndex),
+              };
+
+              navigate("/checkout", { state: { buyNow: true, item: buyItem } });
+            }}
+          >
+            Buy Now
+          </button>
+        </div>
+
+        {/* Risk Reversal Reassurance Section */}
+        <div className="pt-5 pb-3 space-y-3 border-t border-gray-100 mt-4">
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">Guaranteed delivery or full resolution</span>
+          </div>
+          <div className="flex items-start">
+            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
+            <span className="text-sm text-gray-700 leading-relaxed">WhatsApp support before & after delivery</span>
+          </div>
+        </div>
+
+        {/* Trust Badges */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+            <span className="text-green-600">✔</span>
+            Trusted by 1,000+ customers
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+            <span className="text-green-600">🔒</span>
+            Secure & encrypted checkout
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+            <span className="text-green-600">🚚</span>
+            Worldwide insured shipping
+          </div>
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
+            <span className="text-green-600">💬</span>
+            WhatsApp support before & after delivery
+          </div>
+        </div>
+
         {/* Why Customers Choose This */}
         <div className="border-b border-gray-200 pb-6">
           <h3 className="text-sm font-medium text-gray-900 mb-3">
@@ -1055,130 +1179,6 @@ export default function ProductDetail() {
             )}
           </div>
         )}
-
-        {/* Payment Reassurance Section */}
-        <div className="pt-4 pb-3 space-y-3">
-          <div className="flex items-center justify-center text-xs text-gray-600 text-center px-2">
-            <span>🔒 Buyer protection applies · Secure PayPal & card checkout</span>
-          </div>
-          <div className="flex items-center justify-center gap-3 opacity-50">
-            {/* PayPal */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-medium text-gray-400 tracking-wide">PayPal</span>
-            </div>
-            {/* Visa */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">VISA</span>
-            </div>
-            {/* Mastercard */}
-            <div className="flex items-center">
-              <span className="text-[10px] font-semibold text-gray-400 tracking-wide">MC</span>
-            </div>
-            {/* American Express */}
-            <div className="flex items-center">
-              <span className="text-[9px] font-semibold text-gray-400 tracking-wide">AMEX</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex space-x-4 pt-2">
-          <button
-            className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-            onClick={() => {
-              if (product.size?.length && !selectedSize) {
-                alert("Please select a size before adding to cart.");
-                return;
-              }
-              if (hasVariationsProduct && !isInStock(activeVariation)) {
-                alert("Selected variant is out of stock.");
-                return;
-              }
-              if (
-                window.confirm(
-                  "Are you sure you want to add this item to your cart?"
-                )
-              ) {
-                addToCart({
-                  ...product,
-                  pricing: getDisplayPricing(product, selectedVarIndex),
-                  selectedVariation: activeVariation,
-                  selectedSize: selectedSize || null,
-                });
-                navigate("/cart");
-              }
-            }}
-          >
-            Add to Cart
-          </button>
-
-          <button
-            className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
-            onClick={() => {
-              if (product.size?.length && !selectedSize) {
-                alert("Please select a size before buying.");
-                return;
-              }
-              if (hasVariationsProduct && !isInStock(activeVariation)) {
-                alert("Selected variant is out of stock.");
-                return;
-              }
-
-              const buyItem = {
-                $id: product.$id ?? product.id,
-                id: product.$id ?? product.id,
-                name: product.name,
-                price: (pricing?.price ?? product.price) || 0,
-                quantity: 1,
-                image:
-                  product.processedMedia?.[0]?.view ||
-                  product.thumbnail ||
-                  "/placeholder-product.jpg",
-                selectedSize: selectedSize || null,
-                selectedVariation: activeVariation || null,
-                pricing: getDisplayPricing(product, selectedVarIndex),
-              };
-
-              navigate("/checkout", { state: { buyNow: true, item: buyItem } });
-            }}
-          >
-            Buy Now
-          </button>
-        </div>
-
-        {/* Risk Reversal Reassurance Section */}
-        <div className="pt-5 pb-3 space-y-3 border-t border-gray-100 mt-4">
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">Guaranteed delivery or full resolution</span>
-          </div>
-          <div className="flex items-start">
-            <Check className="w-4 h-4 text-gray-900 mr-2.5 mt-0.5 flex-shrink-0" />
-            <span className="text-sm text-gray-700 leading-relaxed">WhatsApp support before & after delivery</span>
-          </div>
-        </div>
-
-        {/* Trust Badges */}
-<div className="mt-4 flex flex-wrap gap-2">
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">✔</span>
-    Trusted by 1,000+ customers
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">🔒</span>
-    Secure & encrypted checkout
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">🚚</span>
-    Worldwide insured shipping
-  </div>
-
-  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 text-xs text-gray-700">
-    <span className="text-green-600">💬</span>
-    WhatsApp support before & after delivery
-  </div>
-</div>
 
         {/* <ProductReviews productId={product.$id} /> */}
       </div>
