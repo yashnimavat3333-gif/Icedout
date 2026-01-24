@@ -43,6 +43,7 @@ const ProductForm = ({ onSuccess }) => {
       { $id: "ring", name: "Ring" },
       { $id: "bracelet", name: "Bracelet" },
       { $id: "plain_watch", name: "Plain Watch" },
+      { $id: "chains", name: "Chains" },
     ]);
     // cleanup on unmount
     return () => {

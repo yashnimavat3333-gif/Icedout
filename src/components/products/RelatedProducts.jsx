@@ -1,10 +1,8 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import productService from "../../appwrite/config";
 
 export default function RelatedProducts({ relatedProducts }) {
-  const navigate = useNavigate();
-
   if (!relatedProducts || relatedProducts.length === 0) return null;
 
   return (
@@ -14,10 +12,11 @@ export default function RelatedProducts({ relatedProducts }) {
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
         {relatedProducts.map((item) => (
-          <div
+          <Link
             key={item.$id}
-            onClick={() => navigate(`/product/${item.$id}`)}
-            className="cursor-pointer group border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
+            to={`/product/${item.$id}`}
+            className="block cursor-pointer group border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
+            aria-label={`View ${item.name || "product"} details`}
           >
             <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
               <img
@@ -48,7 +47,7 @@ export default function RelatedProducts({ relatedProducts }) {
                 ${item.price?.toLocaleString()}
               </p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </section>

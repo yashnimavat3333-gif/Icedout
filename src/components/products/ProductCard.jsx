@@ -1,6 +1,6 @@
 // src/components/ProductCard.jsx
 import React, { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import productService from "../../appwrite/config";
 import PropTypes from "prop-types";
 
@@ -173,7 +173,6 @@ function getCardPricing(product) {
 const ProductCard = ({ product, isAboveFold = false }) => {
   const [loaded, setLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const navigate = useNavigate();
   const fallbackImg = "/assets/no-image.png";
 
   const productId = product?.id || product?.$id || "";
@@ -214,15 +213,11 @@ const ProductCard = ({ product, isAboveFold = false }) => {
     // console.log(product);
   }
   return (
-    <div
-      onClick={() => navigate(`/product/${productId}`)}
-      className="cursor-pointer group rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
+    <Link 
+      to={`/product/${productId}`} 
+      className="block w-full h-full cursor-pointer group rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
+      aria-label={`View ${product?.name || "product"} details`}
     >
-      <Link 
-        to={`/product/${productId}`} 
-        className="block w-full h-full"
-        aria-label={`View ${product?.name || "product"} details`}
-      >
         {/* Image - Fixed aspect-ratio to prevent CLS, optimized dimensions for memory */}
         <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
           {!loaded && (
@@ -254,17 +249,13 @@ const ProductCard = ({ product, isAboveFold = false }) => {
           />
 
           {/* CTA */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-100 group-hover:opacity-100 transition-opacity">
-            <button
-              className="px-4 py-1 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 whitespace-nowrap"
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(`/product/${productId}`);
-              }}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-100 group-hover:opacity-100 transition-opacity z-10">
+            <div
+              className="px-4 py-1 text-sm font-medium rounded-md bg-black text-white hover:bg-neutral-800 whitespace-nowrap pointer-events-none"
               aria-label={`Buy ${product?.name || "product"} now`}
             >
               Buy Now
-            </button>
+            </div>
           </div>
         </div>
 
@@ -294,8 +285,7 @@ const ProductCard = ({ product, isAboveFold = false }) => {
             </div>
           )}
         </div>
-      </Link>
-    </div>
+    </Link>
   );
 };
 
