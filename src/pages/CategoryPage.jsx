@@ -259,6 +259,18 @@ const CategoryPage = ({ category: propCategory }) => {
             "0 products available"
           )}
         </p>
+        {/* Lightweight engagement guidance */}
+        {products.length > 0 && (
+          <p className="text-sm text-gray-600 mt-1">
+            Tap any product to view full details
+          </p>
+        )}
+        {/* Trust signal */}
+        {products.length > 0 && (
+          <p className="text-xs text-gray-400 mt-2">
+            ✓ Worldwide insured shipping • Quality checked before dispatch
+          </p>
+        )}
       </div>
 
       {products.length > 0 ? (

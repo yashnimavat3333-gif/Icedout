@@ -310,6 +310,18 @@ export default function ProductList() {
             products
           </p>
         )}
+        {/* Lightweight engagement guidance */}
+        {hasResults && (
+          <p className="text-sm text-gray-500 mt-1">
+            Tap any product to view full details
+          </p>
+        )}
+        {/* Trust signal */}
+        {hasResults && (
+          <p className="text-xs text-gray-400 mt-2">
+            ✓ Worldwide insured shipping • Quality checked before dispatch
+          </p>
+        )}
       </div>
 
       {/* Controls */}

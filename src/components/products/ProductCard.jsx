@@ -280,10 +280,15 @@ const ProductCard = ({ product, isAboveFold = false }) => {
           </div>
 
           {usedVariations && (
-            <div className="text-[11px] text-gray-500">
+            <div className="text-[11px] text-gray-600">
               {hasMultiple ? "Multiple variants available" : "Variant pricing"}
             </div>
           )}
+
+          {/* Engagement signal - lightweight guidance */}
+          <p className="text-xs text-gray-400 mt-1">
+            Tap to view details →
+          </p>
         </div>
     </Link>
   );
