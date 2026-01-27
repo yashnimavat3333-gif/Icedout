@@ -125,6 +125,45 @@
       window.addEventListener('load', loadEmailJS);
     }
   </script>
+
+  <!-- Microsoft Clarity - User behavior analytics -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "uynsdkk298");
+  </script>
+
+  <!-- Hotjar - User behavior analytics (production only) -->
+  <!-- TODO: Replace YOUR_HOTJAR_SITE_ID with your actual Hotjar Site ID (numeric, e.g., 1234567) -->
+  <!-- To remove Hotjar later, delete this entire script block (lines 139-152) -->
+  <script>
+    (function() {
+      // Only load Hotjar in production (not during development, localhost, or tests)
+      var isProduction = typeof window !== 'undefined' && 
+        window.location.hostname !== 'localhost' && 
+        window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.includes('localhost') &&
+        window.location.protocol === 'https:';
+      
+      if (isProduction) {
+        // IMPORTANT: Replace 0 with your actual Hotjar Site ID (numeric, e.g., 1234567)
+        // The provided script appears to be ContentSquare - please provide your Hotjar Site ID instead
+        var HOTJAR_SITE_ID = 0; // TODO: Replace 0 with your Hotjar Site ID from https://insights.hotjar.com/settings/sites
+        if (HOTJAR_SITE_ID && HOTJAR_SITE_ID !== 0 && typeof HOTJAR_SITE_ID === 'number') {
+          (function(h,o,t,j,a,r){
+            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
+            h._hjSettings={hjid:HOTJAR_SITE_ID,hjsv:6};
+            a=o.getElementsByTagName('head')[0];
+            r=o.createElement('script');r.async=1;
+            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
+            a.appendChild(r);
+          })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
+        }
+      }
+    })();
+  </script>
 </head>
 
 <body>
