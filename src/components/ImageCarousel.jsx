@@ -77,11 +77,13 @@ const ImageCarousel = () => {
         
         {/* Hero Content Overlay */}
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 px-4">
-          <h1 className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-4 max-w-4xl">
-            Premium Timepieces & Fine Jewellery — Trusted by Customers Worldwide
+          {/* Main headline */}
+          <h1 className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-3 max-w-4xl">
+            Premium Timepieces &amp; Fine Jewellery
           </h1>
-          <p className="text-base md:text-lg lg:text-xl text-white/90 text-center mb-6 max-w-2xl">
-            Hand-selected watches and jewellery, quality-checked and delivered worldwide.
+          {/* Single, clear tap reason directly under headline */}
+          <p className="text-lg md:text-xl font-semibold text-white text-center mb-6 max-w-3xl px-2">
+            Tap to view watches →
           </p>
           <button
             onClick={() => navigate("/categories")}
