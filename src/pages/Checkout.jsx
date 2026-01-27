@@ -29,6 +29,11 @@ const APPWRITE_COLLECTION_ID =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_COLLECTION_ID || "6911eeee00020c3218d5"
     : "6911eeee00020c3218d5";
+// Coupons collection ID (for dynamic coupon validation)
+const APPWRITE_COUPONS_COLLECTION_ID = 
+  typeof import.meta !== "undefined"
+    ? import.meta.env.VITE_APPWRITE_COUPONS_COLLECTION_ID || "coupons"
+    : "coupons";
 
 // Read PayPal client id from environment. (Vite: VITE_PAYPAL_CLIENT_ID)
 const ENV_PAYPAL_CLIENT_ID =
@@ -57,35 +62,6 @@ let appwriteDatabases = null;
 // sleep helper
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
-/**
- * PROMO FEATURE (client-side sample catalog)
- */
-const PROMO_CATALOG = {
-  WELCOME10: {
-    code: "WELCOME10",
-    type: "percent",
-    value: 10,
-    minCartValue: 0,
-    expiresAt: "2026-12-31T23:59:59.000Z",
-    description: "10% off for new customers",
-  },
-  FLAT50: {
-    code: "FLAT50",
-    type: "fixed",
-    value: 50,
-    minCartValue: 200,
-    expiresAt: "2026-12-31T23:59:59.000Z",
-    description: "$50 off orders over $200",
-  },
-  FREESHIP: {
-    code: "FREESHIP",
-    type: "fixed",
-    value: 10,
-    minCartValue: 0,
-    expiresAt: "2026-12-31T23:59:59.000Z",
-    description: "$10 off (free shipping promo)",
-  },
-};
 // SDK source and config (keep your APPWRITE_* constants above)
 const APPWRITE_SDK_SRC = "https://cdn.jsdelivr.net/npm/appwrite@14.0.1";
 
@@ -234,11 +210,11 @@ const CheckoutPage = () => {
           0
         );
 
-  // Promo state
-  const [promoInput, setPromoInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState(null);
-  const [promoError, setPromoError] = useState("");
-  const [promoLoading, setPromoLoading] = useState(false);
+  // Coupon state (frontend-only, non-blocking)
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState("");
+  const [couponLoading, setCouponLoading] = useState(false);
 
   useEffect(() => {
     // eagerly pre-load Appwrite so it's ready by checkout time
@@ -363,21 +339,26 @@ const CheckoutPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // compute discount and final total
-  const { discountAmount, finalAmount } = useMemo(() => {
-    if (!appliedPromo)
-      return { discountAmount: 0, finalAmount: subtotalAmount };
-    const promo = appliedPromo;
-    let discount = 0;
-    if (promo.type === "percent") {
-      discount = (subtotalAmount * Number(promo.value || 0)) / 100;
-    } else {
-      discount = Number(promo.value || 0);
+  // compute discount and final total (subtotal-only, non-negative)
+  const { discountAmount, finalAmount, discountPercent } = useMemo(() => {
+    if (!appliedCoupon) {
+      return { discountAmount: 0, finalAmount: subtotalAmount, discountPercent: 0 };
     }
+
+    const pct = Math.min(
+      100,
+      Math.max(0, Number(appliedCoupon.discountPercent || 0))
+    );
+    let discount = (subtotalAmount * pct) / 100;
     if (discount > subtotalAmount) discount = subtotalAmount;
     const final = Math.max(0, subtotalAmount - discount);
-    return { discountAmount: Number(discount), finalAmount: Number(final) };
-  }, [appliedPromo, subtotalAmount]);
+
+    return {
+      discountAmount: Number(discount),
+      finalAmount: Number(final),
+      discountPercent: pct,
+    };
+  }, [appliedCoupon, subtotalAmount]);
 
   // Render PayPal buttons when SDK loaded, form valid, and ref present
   useEffect(() => {
@@ -485,7 +466,7 @@ const CheckoutPage = () => {
     orderData,
     finalAmt,
     discountAmt,
-    promo
+    coupon
   ) => {
     try {
       // ensure SDK + clients are ready
@@ -568,6 +549,14 @@ const CheckoutPage = () => {
         paypal_capture_id:
           orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id ?? null,
         paypal_status: orderData?.status ?? null,
+        // Coupon-related fields (nullable)
+        coupon_code: coupon?.code ?? null,
+        discount_percent:
+          typeof coupon?.discountPercent === "number"
+            ? coupon.discountPercent
+            : null,
+        discount_amount: Number(discountAmt || 0),
+        influencer: coupon?.influencer ?? null,
       };
 
       const response = await appwriteDatabases.createDocument(
@@ -576,6 +565,32 @@ const CheckoutPage = () => {
         ID.unique(),
         payload
       );
+
+      // Increment coupon usage_count if coupon was applied
+      if (coupon?.$id) {
+        try {
+          // Get current coupon document
+          const couponDoc = await appwriteDatabases.getDocument(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COUPONS_COLLECTION_ID,
+            coupon.$id
+          );
+
+          // Increment usage_count
+          const currentUsage = Number(couponDoc.usage_count || 0);
+          await appwriteDatabases.updateDocument(
+            APPWRITE_DATABASE_ID,
+            APPWRITE_COUPONS_COLLECTION_ID,
+            coupon.$id,
+            {
+              usage_count: currentUsage + 1,
+            }
+          );
+        } catch (couponUpdateError) {
+          // Log but don't fail the order if coupon update fails
+          console.warn("Failed to increment coupon usage_count:", couponUpdateError);
+        }
+      }
 
       return response;
     } catch (error) {
@@ -832,7 +847,7 @@ const CheckoutPage = () => {
         order,
         finalAmount,
         discountAmount,
-        appliedPromo
+        appliedCoupon
       );
 
       setCompletedOrder({
@@ -973,63 +988,103 @@ const CheckoutPage = () => {
     }
   };
 
-  // Promo helpers
-  const validatePromoLocal = (code) => {
-    if (!code || typeof code !== "string")
-      return { ok: false, reason: "Invalid code" };
-    const upper = code.trim().toUpperCase();
-    const promo = PROMO_CATALOG[upper];
-    if (!promo) return { ok: false, reason: "Promo code not found" };
-
-    if (promo.expiresAt) {
-      const exp = new Date(promo.expiresAt);
-      if (isNaN(exp.getTime()) === false && exp < new Date()) {
-        return { ok: false, reason: "Promo code expired" };
-      }
+  // Coupon helpers (dynamic, queries Appwrite)
+  const validateCouponFromAppwrite = async (code) => {
+    if (!code || typeof code !== "string") {
+      return { ok: false, reason: "Enter a coupon code" };
     }
 
-    if (promo.minCartValue && subtotalAmount < Number(promo.minCartValue)) {
-      return {
-        ok: false,
-        reason: `Minimum cart value $${promo.minCartValue} required`,
-      };
-    }
-
-    return { ok: true, promo };
-  };
-
-  const applyPromo = async () => {
-    setPromoError("");
-    setPromoLoading(true);
     try {
-      const code = (promoInput || "").trim().toUpperCase();
-      if (!code) {
-        setPromoError("Enter a promo code");
-        setPromoLoading(false);
-        return;
+      // Ensure Appwrite is ready
+      const ready = await ensureAppwriteReady({ timeoutMs: 10000 });
+      if (!ready || !appwriteDatabases) {
+        return { ok: false, reason: "Service unavailable. Please try again." };
       }
 
-      const res = validatePromoLocal(code);
-      if (!res.ok) {
-        setPromoError(res.reason || "Invalid promo");
-        setPromoLoading(false);
-        return;
+      const { Query } = window.Appwrite;
+      const normalizedCode = code.trim().toUpperCase();
+
+      // Query Appwrite coupons collection by code (case-insensitive)
+      const response = await appwriteDatabases.listDocuments(
+        APPWRITE_DATABASE_ID,
+        APPWRITE_COUPONS_COLLECTION_ID,
+        [Query.equal("code", normalizedCode)]
+      );
+
+      const coupons = response?.documents || [];
+      
+      if (coupons.length === 0) {
+        return { ok: false, reason: "Invalid coupon code" };
       }
 
-      setAppliedPromo(res.promo);
-      setPromoError("");
-      setPromoLoading(false);
+      const coupon = coupons[0];
+
+      // Check if coupon is active
+      if (coupon.active !== true) {
+        return { ok: false, reason: "This coupon is not active" };
+      }
+
+      // Validate discount_percent is a valid number
+      const discountPercent = Number(coupon.discount_percent);
+      if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+        return { ok: false, reason: "Invalid discount configuration" };
+      }
+
+      // Return normalized coupon data
+      return {
+        ok: true,
+        coupon: {
+          $id: coupon.$id,
+          code: coupon.code,
+          discountPercent: discountPercent,
+          influencer: coupon.influencer || null,
+        },
+      };
     } catch (err) {
-      console.error("applyPromo err", err);
-      setPromoError("Failed to apply promo");
-      setPromoLoading(false);
+      console.error("validateCouponFromAppwrite error:", err);
+      return { ok: false, reason: "Failed to validate coupon. Please try again." };
     }
   };
 
-  const removePromo = () => {
-    setAppliedPromo(null);
-    setPromoInput("");
-    setPromoError("");
+  const applyCoupon = async () => {
+    setCouponError("");
+    setCouponLoading(true);
+    try {
+      const code = (couponInput || "").trim();
+      if (!code) {
+        setCouponError("Enter a coupon code");
+        setCouponLoading(false);
+        return;
+      }
+
+      // Prevent applying multiple coupons
+      if (appliedCoupon) {
+        setCouponError("Please remove the current coupon before applying a new one");
+        setCouponLoading(false);
+        return;
+      }
+
+      const res = await validateCouponFromAppwrite(code);
+      if (!res.ok) {
+        setCouponError(res.reason || "Invalid coupon");
+        setCouponLoading(false);
+        return;
+      }
+
+      setAppliedCoupon(res.coupon);
+      setCouponError("");
+      setCouponLoading(false);
+    } catch (err) {
+      console.error("applyCoupon err", err);
+      setCouponError("Failed to apply coupon");
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponError("");
   };
 
   // Handle Wise payment test button
@@ -1349,6 +1404,48 @@ const CheckoutPage = () => {
                 )}
               </div>
               <div className="border-t pt-4 space-y-2">
+                {/* Coupon input */}
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Coupon code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                      placeholder="Enter coupon (e.g. ICEYASH10)"
+                    />
+                    {appliedCoupon ? (
+                      <button
+                        type="button"
+                        onClick={removeCoupon}
+                        className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                      >
+                        Remove
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={applyCoupon}
+                        disabled={couponLoading}
+                        className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        {couponLoading ? "Applying..." : "Apply"}
+                      </button>
+                    )}
+                  </div>
+                  {couponError && (
+                    <p className="mt-1 text-xs text-red-600">{couponError}</p>
+                  )}
+                  {appliedCoupon && !couponError && (
+                    <p className="mt-1 text-xs text-green-600">
+                      Coupon <span className="font-semibold">{appliedCoupon.code}</span>{" "}
+                      applied ({discountPercent}% off)
+                    </p>
+                  )}
+                </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
                   <span>${subtotalAmount.toFixed(2)}</span>
