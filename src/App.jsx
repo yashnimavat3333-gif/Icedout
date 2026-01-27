@@ -8,16 +8,9 @@ import { Outlet } from "react-router-dom";
 // ReactLenis disabled to prevent performance issues and periodic freezes
 
 function App() {
+  // Keep a lightweight auth loading state, but don't block initial UI render
   const [loading, setLoading] = useState(true);
   const dispatch = useDispatch();
-
-
-  // Optimized scroll - only scroll on initial load, not on every loading change
-  useEffect(() => {
-    if (loading) return;
-    // Use instant scroll to prevent performance issues
-    window.scrollTo({ top: 0, behavior: "auto" });
-  }, [loading]);
 
   // ✅ Handle login/logout with timeout and error handling
   useEffect(() => {
@@ -63,18 +56,6 @@ function App() {
       clearTimeout(timeoutId);
     };
   }, [dispatch]);
-
-  // ✅ Smooth layout with better loading state
-  if (loading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Completely disable ReactLenis to prevent periodic freezes
   // Smooth scroll libraries can cause performance issues, especially on mobile

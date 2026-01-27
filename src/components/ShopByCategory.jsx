@@ -50,20 +50,34 @@ const ShopByCategory = () => {
   useEffect(() => {
     if (!scrollRef.current) return;
 
+    const el = scrollRef.current;
+
     const updateScroll = () => {
-      setScrollPosition(scrollRef.current.scrollLeft);
-      setMaxScroll(
-        scrollRef.current.scrollWidth - scrollRef.current.clientWidth
-      );
+      if (!el) return;
+      setScrollPosition(el.scrollLeft);
+      setMaxScroll(el.scrollWidth - el.clientWidth);
     };
 
-    scrollRef.current.addEventListener("scroll", updateScroll);
-    updateScroll(); // Initial calculation
+    // Only perform the initial layout read once the page is fully loaded
+    const runInitialWhenReady = () => {
+      if (document.readyState === "complete") {
+        updateScroll();
+      } else {
+        window.addEventListener(
+          "load",
+          () => {
+            updateScroll();
+          },
+          { once: true }
+        );
+      }
+    };
+
+    el.addEventListener("scroll", updateScroll);
+    runInitialWhenReady();
 
     return () => {
-      if (scrollRef.current) {
-        scrollRef.current.removeEventListener("scroll", updateScroll);
-      }
+      el.removeEventListener("scroll", updateScroll);
     };
   }, [categories, visibleCards]);
 

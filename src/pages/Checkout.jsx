@@ -1544,27 +1544,27 @@ const CheckoutPage = () => {
                 {/* TODO: Re-enable Wise after Wise team confirmation */}
                 {/* Wise Test Payment Button - Temporarily disabled */}
                 {WISE_PAYMENT_ENABLED && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <button
-                      onClick={handleWisePayment}
-                      disabled={wiseLoading}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                    >
-                      {wiseLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span>Creating payment link...</span>
-                        </>
-                      ) : (
-                        <span>Pay with Wise (TEST)</span>
-                      )}
-                    </button>
-                    {wiseError && (
-                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                        <p className="text-sm text-red-800">{wiseError}</p>
-                      </div>
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <button
+                    onClick={handleWisePayment}
+                    disabled={wiseLoading}
+                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                  >
+                    {wiseLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Creating payment link...</span>
+                      </>
+                    ) : (
+                      <span>Pay with Wise (TEST)</span>
                     )}
-                  </div>
+                  </button>
+                  {wiseError && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-800">{wiseError}</p>
+                    </div>
+                  )}
+                </div>
                 )}
               </div>
 

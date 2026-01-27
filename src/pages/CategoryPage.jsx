@@ -41,10 +41,19 @@ const CategoryPage = ({ category: propCategory }) => {
     propCategory?.name || location.state?.categoryName || urlCategoryName;
 
   useEffect(() => {
-    // Defer scroll to prevent blocking initial render
-    requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
+    // Defer scroll-to-top until after styles are loaded to avoid early layout thrash
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+
+    if (document.readyState === "complete") {
+      // Run on the next frame so React can paint first
+      requestAnimationFrame(scrollToTop);
+    } else {
+      window.addEventListener("load", () => {
+        requestAnimationFrame(scrollToTop);
+      }, { once: true });
+    }
   }, [categoryName]);
 
   // Fetch a single batch of products
@@ -131,11 +140,11 @@ const CategoryPage = ({ category: propCategory }) => {
         );
 
         // Set products - if no results, show empty state (don't load all products)
-        setProducts(docs);
-        setCursor(newCursor);
-        setHasMore(hasMoreData);
+          setProducts(docs);
+          setCursor(newCursor);
+          setHasMore(hasMoreData);
         // Only show count of loaded products, not total (avoids loading all)
-        setAllProductsCount(docs.length);
+          setAllProductsCount(docs.length);
 
         if (!category && docs.length > 0) {
           setCategory({ name: categoryName });
@@ -189,17 +198,17 @@ const CategoryPage = ({ category: propCategory }) => {
       if (!currentTarget || loadingMore) return;
 
       observer = new IntersectionObserver(
-        (entries) => {
+      (entries) => {
           // Only trigger if element is intersecting and we're not already loading
           if (entries[0]?.isIntersecting && hasMore && !loadingMore && cursor) {
-            loadMore();
-          }
-        },
+          loadMore();
+        }
+      },
         { 
           threshold: 0.1, 
           rootMargin: "300px" // Start loading 300px before reaching bottom for smoother UX
         }
-      );
+    );
 
       observer.observe(currentTarget);
     };
@@ -281,22 +290,22 @@ const CategoryPage = ({ category: propCategory }) => {
               const isAboveFold = index < 8;
               return (
                 <ProductCard
-                  key={product.$id}
+                key={product.$id}
                   isAboveFold={isAboveFold}
-                  product={{
-                    id: product.$id,
-                    $id: product.$id,
-                    name: product.name,
-                    subtitle: product.subtitle || product.category,
-                    price: product.price,
-                    images: product.images,
-                    variations: product.variations,
-                    useVariations: product.useVariations,
-                    compareAtPrice: product.compareAtPrice,
-                    mrp: product.mrp,
-                    listPrice: product.listPrice,
-                  }}
-                />
+                product={{
+                  id: product.$id,
+                  $id: product.$id,
+                  name: product.name,
+                  subtitle: product.subtitle || product.category,
+                  price: product.price,
+                  images: product.images,
+                  variations: product.variations,
+                  useVariations: product.useVariations,
+                  compareAtPrice: product.compareAtPrice,
+                  mrp: product.mrp,
+                  listPrice: product.listPrice,
+                }}
+              />
               );
             })}
           </div>
