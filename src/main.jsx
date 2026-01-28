@@ -179,12 +179,35 @@ const router = createBrowserRouter([
   },
 ]);
 
-// Load analytics asynchronously to prevent blocking
-try {
-  loadGtag();
-} catch (error) {
-  console.warn("Failed to load analytics:", error);
-  // Continue anyway - analytics failure shouldn't block the app
+// Load analytics in a non-blocking way after first interaction (mobile-safe)
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  try {
+    let analyticsLoaded = false;
+
+    const loadAnalyticsOnce = () => {
+      if (analyticsLoaded) return;
+      analyticsLoaded = true;
+      try {
+        loadGtag();
+      } catch (error) {
+        console.warn("Failed to load analytics:", error);
+      }
+    };
+
+    // Defer until first interaction or 5s timeout
+    ["click", "touchstart", "scroll", "keydown"].forEach((evt) => {
+      document.addEventListener(evt, loadAnalyticsOnce, {
+        passive: true,
+        once: true,
+      });
+    });
+
+    setTimeout(() => {
+      loadAnalyticsOnce();
+    }, 5000);
+  } catch (e) {
+    console.warn("Analytics init skipped:", e);
+  }
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(
