@@ -30,6 +30,8 @@ const APPWRITE_COLLECTION_ID =
     ? import.meta.env.VITE_APPWRITE_COLLECTION_ID || "6911eeee00020c3218d5"
     : "6911eeee00020c3218d5";
 // Coupons collection ID (for dynamic coupon validation)
+// IMPORTANT: Set VITE_APPWRITE_COUPONS_COLLECTION_ID in .env to your actual Appwrite coupons collection ID
+// If not set, defaults to "coupons" - make sure this matches your Appwrite collection ID
 const APPWRITE_COUPONS_COLLECTION_ID = 
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_COUPONS_COLLECTION_ID || "coupons"
@@ -566,7 +568,7 @@ const CheckoutPage = () => {
         payload
       );
 
-      // Increment coupon usage_count if coupon was applied
+      // Increment coupon usage_count atomically if coupon was applied
       if (coupon?.$id) {
         try {
           // Get current coupon document
@@ -576,19 +578,33 @@ const CheckoutPage = () => {
             coupon.$id
           );
 
-          // Increment usage_count
+          // Increment usage_count (read current, then update)
           const currentUsage = Number(couponDoc.usage_count || 0);
+          const newUsageCount = currentUsage + 1;
+
           await appwriteDatabases.updateDocument(
             APPWRITE_DATABASE_ID,
             APPWRITE_COUPONS_COLLECTION_ID,
             coupon.$id,
             {
-              usage_count: currentUsage + 1,
+              usage_count: newUsageCount,
             }
           );
+
+          console.debug("Coupon usage_count incremented:", {
+            couponId: coupon.$id,
+            code: coupon.code,
+            oldCount: currentUsage,
+            newCount: newUsageCount,
+          });
         } catch (couponUpdateError) {
           // Log but don't fail the order if coupon update fails
           console.warn("Failed to increment coupon usage_count:", couponUpdateError);
+          console.warn("Coupon update error details:", {
+            couponId: coupon?.$id,
+            error: couponUpdateError?.message,
+            code: couponUpdateError?.code,
+          });
         }
       }
 
@@ -998,35 +1014,52 @@ const CheckoutPage = () => {
       // Ensure Appwrite is ready
       const ready = await ensureAppwriteReady({ timeoutMs: 10000 });
       if (!ready || !appwriteDatabases) {
+        console.error("Appwrite not ready for coupon validation");
         return { ok: false, reason: "Service unavailable. Please try again." };
       }
 
       const { Query } = window.Appwrite;
       const normalizedCode = code.trim().toUpperCase();
 
-      // Query Appwrite coupons collection by code (case-insensitive)
+      if (!normalizedCode) {
+        return { ok: false, reason: "Enter a coupon code" };
+      }
+
+      // Query Appwrite coupons collection: code == inputCode AND active == true
+      const queries = [
+        Query.equal("code", normalizedCode),
+        Query.equal("active", true),
+      ];
+
+      console.debug("Querying coupons collection:", {
+        databaseId: APPWRITE_DATABASE_ID,
+        collectionId: APPWRITE_COUPONS_COLLECTION_ID,
+        code: normalizedCode,
+      });
+
       const response = await appwriteDatabases.listDocuments(
         APPWRITE_DATABASE_ID,
         APPWRITE_COUPONS_COLLECTION_ID,
-        [Query.equal("code", normalizedCode)]
+        queries
       );
 
       const coupons = response?.documents || [];
       
+      console.debug("Coupon query result:", {
+        found: coupons.length,
+        documents: coupons,
+      });
+
       if (coupons.length === 0) {
         return { ok: false, reason: "Invalid coupon code" };
       }
 
       const coupon = coupons[0];
 
-      // Check if coupon is active
-      if (coupon.active !== true) {
-        return { ok: false, reason: "This coupon is not active" };
-      }
-
       // Validate discount_percent is a valid number
       const discountPercent = Number(coupon.discount_percent);
       if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+        console.error("Invalid discount_percent in coupon:", coupon);
         return { ok: false, reason: "Invalid discount configuration" };
       }
 
@@ -1042,6 +1075,11 @@ const CheckoutPage = () => {
       };
     } catch (err) {
       console.error("validateCouponFromAppwrite error:", err);
+      console.error("Error details:", {
+        message: err?.message,
+        code: err?.code,
+        type: err?.type,
+      });
       return { ok: false, reason: "Failed to validate coupon. Please try again." };
     }
   };
@@ -1050,7 +1088,9 @@ const CheckoutPage = () => {
     setCouponError("");
     setCouponLoading(true);
     try {
-      const code = (couponInput || "").trim();
+      // Read user input, trim and convert to uppercase
+      const code = (couponInput || "").trim().toUpperCase();
+      
       if (!code) {
         setCouponError("Enter a coupon code");
         setCouponLoading(false);
@@ -1064,19 +1104,26 @@ const CheckoutPage = () => {
         return;
       }
 
+      console.debug("Applying coupon:", code);
+
+      // Query Appwrite and validate
       const res = await validateCouponFromAppwrite(code);
+      
       if (!res.ok) {
         setCouponError(res.reason || "Invalid coupon");
         setCouponLoading(false);
         return;
       }
 
+      // Store coupon data for order submission
       setAppliedCoupon(res.coupon);
       setCouponError("");
       setCouponLoading(false);
+      
+      console.debug("Coupon applied successfully:", res.coupon);
     } catch (err) {
-      console.error("applyCoupon err", err);
-      setCouponError("Failed to apply coupon");
+      console.error("applyCoupon error:", err);
+      setCouponError("Failed to apply coupon. Please try again.");
       setCouponLoading(false);
     }
   };

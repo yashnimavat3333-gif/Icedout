@@ -72,67 +72,168 @@
   <link rel="preconnect" href="https://fra.cloud.appwrite.io">
   <link rel="dns-prefetch" href="https://www.googletagmanager.com">
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+  
+  <!-- Preload critical hero image to prevent CLS -->
+  <link rel="preload" as="image" href="/IMG_3084.JPG" fetchpriority="high" />
+  <link rel="preload" as="image" href="/IMG_3084.jpg" fetchpriority="high" />
 
   <!-- Defer non-critical scripts to prevent render blocking -->
   <script>
-    // Load Google Analytics with requestIdleCallback to prevent blocking
-    function loadAnalytics() {
-      const script = document.createElement('script');
-      script.async = true;
-      script.defer = true;
-      script.src = 'https://www.googletagmanager.com/gtag/js?id=G-X03NVF8TXL';
-      document.head.appendChild(script);
+    // Guard against undefined errors in in-app browsers
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      // Load Google Analytics after first interaction or 5 seconds
+      function loadAnalytics() {
+        try {
+          const script = document.createElement('script');
+          script.async = true;
+          script.defer = true;
+          script.src = 'https://www.googletagmanager.com/gtag/js?id=G-X03NVF8TXL';
+          
+          script.onload = function() {
+            try {
+              if (typeof window !== 'undefined') {
+                window.dataLayer = window.dataLayer || [];
+                function gtag() { 
+                  if (window.dataLayer) {
+                    window.dataLayer.push(arguments); 
+                  }
+                }
+                window.gtag = gtag;
+                gtag('js', new Date());
+                gtag('config', 'G-X03NVF8TXL', { send_page_view: false });
+              }
+            } catch (e) {
+              // Silently fail
+            }
+          };
+          
+          if (document.head) {
+            document.head.appendChild(script);
+          }
+        } catch (e) {
+          // Silently fail
+        }
+      }
       
-      script.onload = function() {
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { window.dataLayer.push(arguments); }
-        window.gtag = gtag;
-        gtag('js', new Date());
-        gtag('config', 'G-X03NVF8TXL', { send_page_view: false });
+      // Load after first interaction or 5 seconds
+      var analyticsLoaded = false;
+      var loadAnalyticsOnce = function() {
+        if (!analyticsLoaded) {
+          analyticsLoaded = true;
+          loadAnalytics();
+        }
       };
-    }
-    
-    // Use requestIdleCallback if available, otherwise wait for load event
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(loadAnalytics, { timeout: 2000 });
-    } else {
-      window.addEventListener('load', loadAnalytics);
+      
+      ['click', 'touchstart', 'scroll'].forEach(function(evt) {
+        document.addEventListener(evt, loadAnalyticsOnce, { passive: true, once: true });
+      });
+      
+      setTimeout(function() {
+        if (!analyticsLoaded) {
+          loadAnalyticsOnce();
+        }
+      }, 5000);
     }
   </script>
 
-  <!-- EmailJS - Load asynchronously with requestIdleCallback -->
+  <!-- EmailJS - Load after first interaction (non-critical) -->
   <script>
-    function loadEmailJS() {
-      const emailScript = document.createElement('script');
-      emailScript.type = 'text/javascript';
-      emailScript.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
-      emailScript.async = true;
-      emailScript.defer = true;
-      emailScript.onload = function() {
-        if (window.emailjs) {
-          emailjs.init({
-            publicKey: "6CgXUh7CTnIOoZsLT",
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      function loadEmailJS() {
+        try {
+          const emailScript = document.createElement('script');
+          emailScript.type = 'text/javascript';
+          emailScript.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+          emailScript.async = true;
+          emailScript.defer = true;
+          emailScript.onload = function() {
+            try {
+              if (typeof window !== 'undefined' && window.emailjs) {
+                emailjs.init({
+                  publicKey: "6CgXUh7CTnIOoZsLT",
+                });
+              }
+            } catch (e) {
+              // Silently fail
+            }
+          };
+          if (document.head) {
+            document.head.appendChild(emailScript);
+          }
+        } catch (e) {
+          // Silently fail
+        }
+      }
+      
+      // Load after first interaction or 5 seconds
+      var emailJSLoaded = false;
+      var loadEmailJSOnce = function() {
+        if (!emailJSLoaded) {
+          emailJSLoaded = true;
+          loadEmailJS();
+        }
+      };
+      
+      ['click', 'touchstart'].forEach(function(evt) {
+        document.addEventListener(evt, loadEmailJSOnce, { passive: true, once: true });
+      });
+      
+      setTimeout(function() {
+        if (!emailJSLoaded) {
+          loadEmailJSOnce();
+        }
+      }, 5000);
+    }
+  </script>
+
+  <!-- Microsoft Clarity - Deferred until after first interaction (prevents blocking) -->
+  <script type="text/javascript">
+    (function() {
+      // Guard against undefined errors in in-app browsers
+      if (typeof window === 'undefined' || typeof document === 'undefined') return;
+      
+      // Defer Clarity until after first user interaction or 3 seconds
+      var loadClarity = function() {
+        try {
+          (function(c,l,a,r,i,t,y){
+            if (typeof c === 'undefined' || typeof l === 'undefined') return;
+            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+            y=l.getElementsByTagName(r)[0];
+            if (y && y.parentNode) {
+              y.parentNode.insertBefore(t,y);
+            }
+          })(window, document, "clarity", "script", "uynsdkk298");
+        } catch (e) {
+          // Silently fail - don't break the page
+        }
+      };
+      
+      // Load after first interaction (click, touch, scroll)
+      var interactionEvents = ['click', 'touchstart', 'scroll', 'keydown'];
+      var loaded = false;
+      var loadOnce = function() {
+        if (!loaded) {
+          loaded = true;
+          loadClarity();
+          interactionEvents.forEach(function(evt) {
+            document.removeEventListener(evt, loadOnce, { passive: true });
           });
         }
       };
-      document.head.appendChild(emailScript);
-    }
-    
-    // Use requestIdleCallback if available, otherwise wait for load event
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(loadEmailJS, { timeout: 3000 });
-    } else {
-      window.addEventListener('load', loadEmailJS);
-    }
-  </script>
-
-  <!-- Microsoft Clarity - User behavior analytics -->
-  <script type="text/javascript">
-    (function(c,l,a,r,i,t,y){
-        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-    })(window, document, "clarity", "script", "uynsdkk298");
+      
+      interactionEvents.forEach(function(evt) {
+        document.addEventListener(evt, loadOnce, { passive: true, once: true });
+      });
+      
+      // Fallback: load after 3 seconds if no interaction
+      setTimeout(function() {
+        if (!loaded) {
+          loadClarity();
+          loaded = true;
+        }
+      }, 3000);
+    })();
   </script>
 
   <!-- Hotjar - User behavior analytics (production only) -->

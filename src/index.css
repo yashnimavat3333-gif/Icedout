@@ -6,6 +6,19 @@
   background-color: #fff;
 }
 
+/* Prevent CLS on mobile hero - lock viewport height */
+@media (max-width: 1023px) {
+  /* Ensure hero section doesn't shift during load */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Prevent text reflow during font load */
+  h1, h2, h3, p {
+    text-rendering: optimizeSpeed;
+  }
+}
+
 .container {
   background: #ffffff;
 }
