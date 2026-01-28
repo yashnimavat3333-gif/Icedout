@@ -293,7 +293,7 @@ const Header = () => {
 
         {/* Mobile Header */}
         <div className="lg:hidden">
-          <div className="px-4 py-4 flex items-center justify-between">
+          <div className="px-4 py-3 flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => setIsMenuOpen((v) => !v)}
@@ -327,6 +327,24 @@ const Header = () => {
               </Link>
             </div>
           </div>
+
+          {/* Mobile-only quick nav bar: Shop / Collections */}
+          <nav className="px-4 pt-1 pb-1">
+            <div className="flex justify-center gap-6 text-sm font-medium">
+              <Link
+                to="/shop"
+                style={{ color: colors.darkGreen }}
+              >
+                Shop
+              </Link>
+              <Link
+                to="/collections"
+                style={{ color: colors.darkGreen }}
+              >
+                Collections
+              </Link>
+            </div>
+          </nav>
 
           {isSearchOpen && (
             <div

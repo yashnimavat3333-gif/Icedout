@@ -122,10 +122,12 @@ const ImageCarousel = () => {
           }}
         />
         
-        {/* Hero Content Overlay - ONE headline, ONE subline, ONE CTA */}
+        {/* Hero Content Overlay - ONE headline, ONE CTA */}
         <div 
-          className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 px-4"
+          className="absolute inset-0 flex flex-col items-center justify-center px-4"
           style={{
+            // Subtle dark gradient for readability
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.35), rgba(0,0,0,0.15))',
             // Prevent text reflow during load
             minHeight: '100%',
             willChange: 'auto'
@@ -133,27 +135,15 @@ const ImageCarousel = () => {
         >
           {/* ONE Main headline - fixed height prevents CLS */}
           <h1 
-            className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-3 max-w-4xl"
+            className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-4 max-w-4xl"
             style={{
               // Lock height to prevent reflow
               minHeight: '2.5rem',
-              lineHeight: '1.2'
+              lineHeight: '1.25'
             }}
           >
-            Premium Timepieces &amp; Fine Jewellery
+            Hand-Set VVS Diamond Luxury Watches &amp; Jewellery
           </h1>
-          
-          {/* ONE Subline - fixed height prevents CLS */}
-          <p 
-            className="text-lg md:text-xl font-semibold text-white text-center mb-6 max-w-3xl px-2"
-            style={{
-              // Lock height to prevent reflow
-              minHeight: '1.5rem',
-              lineHeight: '1.3'
-            }}
-          >
-            Tap to view watches →
-          </p>
           
           {/* ONE CTA - instant click, no delays */}
           <button
@@ -167,9 +157,9 @@ const ImageCarousel = () => {
               // Prevent layout shift
               willChange: 'auto'
             }}
-            aria-label="Explore our watch collection"
+            aria-label="Explore our luxury collections"
           >
-            Explore Collection
+            Explore Collections
           </button>
         </div>
       </div>
