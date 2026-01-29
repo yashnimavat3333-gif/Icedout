@@ -3,10 +3,10 @@ import { useNavigate } from "react-router-dom";
 const ImageCarousel = () => {
   const navigate = useNavigate();
   
-  // Vite asset resolution: Use BASE_URL for proper SPA routing compatibility
-  // BASE_URL defaults to '/' but ensures correct paths in all environments (Vercel/Netlify SPA routing)
-  const baseUrl = import.meta.env.BASE_URL || '/';
-  const heroImageSrc = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}img_3084.jpg`.replace(/\/+/g, '/');
+  // Vite asset resolution: Public folder assets are served from root
+  // Use direct path - Vite serves /public files at root level
+  // This works in both dev and production (Vercel/Netlify SPA routing)
+  const heroImageSrc = '/img_3084.jpg';
 
   // Mobile-first: Use optimized image sizes
   // Mobile: 800px width (h-[20rem] = 320px), Desktop: 1920px width (h-[700px])
@@ -56,8 +56,8 @@ const ImageCarousel = () => {
           style={{ height: '700px', aspectRatio: '16/9' }} 
         />
         
-        {/* Hero Image - LCP Element: Preloaded, optimized with explicit dimensions */}
-        {/* Vite asset resolution: Uses import.meta.env.BASE_URL for SPA routing compatibility */}
+        {/* Hero Image - LCP Element: Optimized with explicit dimensions */}
+        {/* Vite asset resolution: Public folder files are served from root */}
         <img
           src={heroImageSrc}
           alt="Premium Timepieces & Fine Jewellery"
@@ -75,10 +75,13 @@ const ImageCarousel = () => {
             minWidth: '100%',
             // Ensure image is visible (not hidden by default)
             opacity: 1,
-            zIndex: 1
+            zIndex: 1,
+            // Ensure image displays even if there are loading issues
+            display: 'block',
+            visibility: 'visible'
           }}
           onError={(e) => {
-            // Simplified error handling - try fallback once, then show placeholder
+            // Try alternative filename variations if first attempt fails
             try {
               const img = e.target;
               if (!img) return;
@@ -88,27 +91,24 @@ const ImageCarousel = () => {
                 img.dataset.attempts = String(attempts);
               }
               
-              // Try alternative path if first attempt fails
+              // Try different filename variations (case-insensitive fallbacks)
               if (attempts === 1) {
-                img.src = heroImageSrc;
+                img.src = '/IMG_3084.JPG';
+              } else if (attempts === 2) {
+                img.src = '/IMG_3084.jpg';
+              } else if (attempts === 3) {
+                img.src = '/img_3084.JPG';
               } else {
-                // Final fallback: hide image and show gradient background
-                if (img.style) {
-                  img.style.display = 'none';
-                }
-                // Apply gradient to parent container
+                // All attempts failed - log for debugging but don't hide image
+                console.warn('Hero image failed to load after all attempts');
+                // Keep image visible but ensure background is set
                 const container = img.closest('.hero-container-mobile, .hero-container-desktop') || img.parentElement;
                 if (container && container.style) {
                   container.style.background = 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)';
                 }
               }
             } catch (error) {
-              // Silently fail - don't break the page
-              try {
-                if (e?.target?.style) {
-                  e.target.style.display = 'none';
-                }
-              } catch {}
+              console.error('Error handling image load failure:', error);
             }
           }}
           onLoad={(e) => {
@@ -127,13 +127,15 @@ const ImageCarousel = () => {
         <div 
           className="absolute inset-0 flex flex-col items-center justify-center px-4"
           style={{
-            // Subtle dark gradient for readability (lighter to show image better)
-            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.5), rgba(0,0,0,0.2), rgba(0,0,0,0.05))',
+            // Lighter gradient overlay to ensure hero image is visible
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.3), rgba(0,0,0,0.1), transparent)',
             // Prevent text reflow during load
             minHeight: '100%',
             willChange: 'auto',
             // Ensure overlay is above image but doesn't block it
-            zIndex: 2
+            zIndex: 2,
+            // Ensure overlay doesn't prevent image from showing
+            pointerEvents: 'none'
           }}
         >
           {/* ONE Main headline - fixed height prevents CLS */}
@@ -158,7 +160,9 @@ const ImageCarousel = () => {
               cursor: 'pointer',
               touchAction: 'manipulation',
               // Prevent layout shift
-              willChange: 'auto'
+              willChange: 'auto',
+              // Re-enable pointer events for button (overlay has pointerEvents: none)
+              pointerEvents: 'auto'
             }}
             aria-label="Explore our luxury collections"
           >
