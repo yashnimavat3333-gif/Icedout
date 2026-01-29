@@ -8,8 +8,9 @@ import { Outlet } from "react-router-dom";
 // ReactLenis disabled to prevent performance issues and periodic freezes
 
 function App() {
-  // Keep a lightweight auth loading state, but don't block initial UI render
-  const [loading, setLoading] = useState(true);
+  // Facebook browser fix: Don't block UI with loading state
+  // Show content immediately, auth can load in background
+  const [loading, setLoading] = useState(false); // Changed to false - never block initial render
   const dispatch = useDispatch();
 
   // ✅ Handle login/logout with timeout and error handling

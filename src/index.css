@@ -19,6 +19,34 @@
   }
 }
 
+/* Desktop hero height fix (for Facebook browser compatibility) */
+@media (min-width: 1024px) {
+  .hero-container-desktop {
+    min-height: 700px !important;
+    height: 700px !important;
+    aspect-ratio: 16/9;
+    background-color: #2a2a2a; /* Fallback if image fails */
+  }
+}
+
+/* Hero container fallback background */
+.hero-container-mobile,
+.hero-container-desktop {
+  background-color: #2a2a2a; /* Dark gray instead of black */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Facebook in-app browser specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS/Facebook browser specific */
+  .hero-container-mobile {
+    min-height: 100vh; /* Fallback for Facebook browser */
+    height: 100vh;
+  }
+}
+
 .container {
   background: #ffffff;
 }

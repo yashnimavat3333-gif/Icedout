@@ -34,18 +34,15 @@ const ImageCarousel = () => {
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
       {/* Fixed height container - prevents CLS on mobile using 100svh */}
+      {/* Facebook in-app browser fix: Use CSS classes instead of conditional JS styles */}
       <div 
-        className="relative w-full"
+        className="relative w-full hero-container-mobile lg:hero-container-desktop"
         style={{ 
-          // Mobile: Lock to viewport height to prevent CLS
+          // Mobile: Lock to viewport height to prevent CLS (works in Facebook browser)
           minHeight: '100svh',
           height: '100svh',
-          // Desktop: Use fixed aspect ratio
-          ...(typeof window !== 'undefined' && window.innerWidth >= 1024 ? {
-            minHeight: '700px',
-            height: '700px',
-            aspectRatio: '16/9'
-          } : {})
+          // Fallback background color (not black) if image fails to load
+          backgroundColor: '#2a2a2a',
         }}
       >
         {/* Desktop height spacer (hidden on mobile) */}
@@ -55,8 +52,9 @@ const ImageCarousel = () => {
         />
         
         {/* Hero Image - LCP Element: Preloaded, optimized with explicit dimensions */}
+        {/* Fix: Use correct lowercase filename from public folder */}
         <img
-          src="/IMG_3084.JPG"
+          src="/img_3084.jpg"
           alt="Premium Timepieces & Fine Jewellery"
           className="w-full h-full object-cover absolute inset-0"
           width={desktopWidth}
@@ -69,56 +67,54 @@ const ImageCarousel = () => {
             objectFit: 'cover',
             // Prevent image reflow during load
             minHeight: '100%',
-            minWidth: '100%'
+            minWidth: '100%',
+            // Ensure image is visible (not hidden by default)
+            opacity: 1,
+            zIndex: 1
           }}
           onError={(e) => {
+            // Simplified error handling - try fallback once, then show placeholder
             try {
               const img = e.target;
-              if (!img || !img.dataset) return;
+              if (!img) return;
               
-              const currentSrc = img.src;
-              
-              // Track attempts to avoid infinite loop
-              if (!img.dataset.attempts) {
-                img.dataset.attempts = '1';
-              } else {
-                const attempts = parseInt(img.dataset.attempts) || 0;
-                img.dataset.attempts = (attempts + 1).toString();
+              const attempts = parseInt(img.dataset?.attempts || '0') + 1;
+              if (img.dataset) {
+                img.dataset.attempts = String(attempts);
               }
               
-              const attempts = parseInt(img.dataset.attempts) || 1;
-              
-              // Try different extensions
+              // Try lowercase version if uppercase fails
               if (attempts === 1) {
-                img.src = '/IMG_3084.jpg';
-              } else if (attempts === 2) {
-                img.src = '/IMG_3084.jpeg';
-              } else if (attempts === 3) {
-                img.src = '/IMG_3084.png';
+                img.src = '/img_3084.jpg';
               } else {
-                // All local attempts failed, use professional luxury watch/jewellery image
-                // Optimized Unsplash image with mobile-friendly size
-                const isMobile = getIsMobile();
-                const optimizedWidth = isMobile ? 800 : 1920;
-                img.src = `https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=${optimizedWidth}&q=75`;
-                
-                // Final fallback to gradient if even Unsplash fails
-                img.onerror = () => {
-                  try {
-                    if (img && img.style) {
-                      img.style.display = 'none';
-                    }
-                    if (img && img.parentElement) {
-                      img.parentElement.classList.add('bg-gradient-to-br', 'from-gray-900', 'via-gray-800', 'to-gray-900');
-                    }
-                  } catch (fallbackError) {
-                    // Silently fail - don't break the page
-                  }
-                };
+                // Final fallback: hide image and show gradient background
+                if (img.style) {
+                  img.style.display = 'none';
+                }
+                // Apply gradient to parent container
+                const container = img.closest('.hero-container-mobile, .hero-container-desktop') || img.parentElement;
+                if (container && container.style) {
+                  container.style.background = 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%)';
+                }
               }
             } catch (error) {
-              // Silently fail - don't break the page in in-app browsers
+              // Silently fail - don't break the page
+              try {
+                if (e?.target?.style) {
+                  e.target.style.display = 'none';
+                }
+              } catch {}
             }
+          }}
+          onLoad={() => {
+            // Ensure image is visible when loaded
+            try {
+              const img = document.querySelector('img[src="/img_3084.jpg"]');
+              if (img && img.style) {
+                img.style.opacity = '1';
+                img.style.display = 'block';
+              }
+            } catch {}
           }}
         />
         
@@ -126,11 +122,13 @@ const ImageCarousel = () => {
         <div 
           className="absolute inset-0 flex flex-col items-center justify-center px-4"
           style={{
-            // Subtle dark gradient for readability
-            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.35), rgba(0,0,0,0.15))',
+            // Subtle dark gradient for readability (lighter to show image better)
+            backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.5), rgba(0,0,0,0.2), rgba(0,0,0,0.05))',
             // Prevent text reflow during load
             minHeight: '100%',
-            willChange: 'auto'
+            willChange: 'auto',
+            // Ensure overlay is above image but doesn't block it
+            zIndex: 2
           }}
         >
           {/* ONE Main headline - fixed height prevents CLS */}

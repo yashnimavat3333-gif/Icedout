@@ -13,6 +13,7 @@ const Header = () => {
   const location = useLocation();
   
   // Delay WhatsApp widget on product pages to prevent blocking initial render
+  // Facebook browser fix: Don't show on homepage to prevent interference
   const [showWhatsApp, setShowWhatsApp] = useState(false);
 
   // Refs
@@ -55,22 +56,30 @@ const Header = () => {
   }, []);
 
   // Delay WhatsApp widget on product pages to prevent blocking initial render
+  // Facebook browser fix: Only show on product pages, never on homepage
   useEffect(() => {
     const isProductPage = location.pathname.startsWith("/product/");
+    const isHomePage = location.pathname === "/";
     
     if (isProductPage) {
       // Reset and delay on product pages
       setShowWhatsApp(false);
       
-      // Delay WhatsApp widget by 1-2 seconds on product pages
+      // Delay WhatsApp widget by 2 seconds on product pages (Facebook browser needs more time)
       const delayTimer = setTimeout(() => {
         setShowWhatsApp(true);
-      }, 1500); // 1.5 second delay
+      }, 2000); // 2 second delay for Facebook browser compatibility
       
       return () => clearTimeout(delayTimer);
+    } else if (isHomePage) {
+      // Never show on homepage (prevents Facebook browser interference)
+      setShowWhatsApp(false);
     } else {
-      // Show immediately on non-product pages
-      setShowWhatsApp(true);
+      // Show on other pages after delay
+      const delayTimer = setTimeout(() => {
+        setShowWhatsApp(true);
+      }, 2000);
+      return () => clearTimeout(delayTimer);
     }
   }, [location.pathname]);
 
