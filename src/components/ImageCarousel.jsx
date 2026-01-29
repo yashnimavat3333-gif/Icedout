@@ -60,7 +60,7 @@ const ImageCarousel = () => {
           width={desktopWidth}
           height={desktopHeight}
           loading="eager"
-          fetchPriority="high"
+          fetchpriority="high"
           decoding="sync"
           style={{ 
             aspectRatio: '16/9', 

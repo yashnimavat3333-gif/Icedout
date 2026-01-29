@@ -81,17 +81,7 @@
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   
   <!-- Preload critical hero image to prevent CLS -->
-  <!-- Fix: Use correct lowercase filename from public folder -->
-  <link rel="preload" as="image" href="/img_3084.jpg" fetchpriority="high" crossorigin="anonymous" />
   
-  <!-- Facebook browser: Ensure critical CSS loads first -->
-  <style>
-    /* Critical above-the-fold CSS for Facebook browser */
-    body { margin: 0; padding: 0; background: #fff; }
-    #root { min-height: 100vh; }
-    /* Prevent Facebook browser from showing blank screen */
-    .hero-container-mobile { min-height: 100vh; height: 100vh; }
-  </style>
 
   <!-- Defer non-critical scripts to prevent render blocking -->
   <script>
