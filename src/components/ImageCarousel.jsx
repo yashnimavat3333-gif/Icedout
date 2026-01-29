@@ -2,6 +2,11 @@ import { useNavigate } from "react-router-dom";
 
 const ImageCarousel = () => {
   const navigate = useNavigate();
+  
+  // Vite asset resolution: Use BASE_URL for proper SPA routing compatibility
+  // BASE_URL defaults to '/' but ensures correct paths in all environments (Vercel/Netlify SPA routing)
+  const baseUrl = import.meta.env.BASE_URL || '/';
+  const heroImageSrc = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}img_3084.jpg`.replace(/\/+/g, '/');
 
   // Mobile-first: Use optimized image sizes
   // Mobile: 800px width (h-[20rem] = 320px), Desktop: 1920px width (h-[700px])
@@ -52,9 +57,9 @@ const ImageCarousel = () => {
         />
         
         {/* Hero Image - LCP Element: Preloaded, optimized with explicit dimensions */}
-        {/* Fix: Use correct lowercase filename from public folder */}
+        {/* Vite asset resolution: Uses import.meta.env.BASE_URL for SPA routing compatibility */}
         <img
-          src="/img_3084.jpg"
+          src={heroImageSrc}
           alt="Premium Timepieces & Fine Jewellery"
           className="w-full h-full object-cover absolute inset-0"
           width={desktopWidth}
@@ -83,9 +88,9 @@ const ImageCarousel = () => {
                 img.dataset.attempts = String(attempts);
               }
               
-              // Try lowercase version if uppercase fails
+              // Try alternative path if first attempt fails
               if (attempts === 1) {
-                img.src = '/img_3084.jpg';
+                img.src = heroImageSrc;
               } else {
                 // Final fallback: hide image and show gradient background
                 if (img.style) {
@@ -106,10 +111,10 @@ const ImageCarousel = () => {
               } catch {}
             }
           }}
-          onLoad={() => {
+          onLoad={(e) => {
             // Ensure image is visible when loaded
             try {
-              const img = document.querySelector('img[src="/img_3084.jpg"]');
+              const img = e.target;
               if (img && img.style) {
                 img.style.opacity = '1';
                 img.style.display = 'block';
