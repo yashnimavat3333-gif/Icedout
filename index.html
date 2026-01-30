@@ -83,6 +83,78 @@
   <!-- Preload critical hero image to prevent CLS -->
   
 
+  <!-- Global error handler for Facebook in-app browser compatibility -->
+  <script>
+    // Fix for Facebook in-app browser: Prevent webkit.messageHandlers errors
+    // This error occurs when scripts try to access iOS-specific APIs that don't exist in web views
+    (function() {
+      if (typeof window === 'undefined') return;
+      
+      // Detect Facebook in-app browser
+      var isFacebookBrowser = /FBAN|FBAV|FB_IAB|FB4A/i.test(navigator.userAgent || '');
+      
+      // Create safe webkit object if it doesn't exist (prevents "undefined is not an object" errors)
+      if (!window.webkit) {
+        window.webkit = {};
+      }
+      if (!window.webkit.messageHandlers) {
+        window.webkit.messageHandlers = {};
+      }
+      
+      // Add safe handler stubs to prevent errors when code tries to call them
+      if (isFacebookBrowser) {
+        // Create a safe postMessage stub that does nothing
+        var safeHandler = {
+          postMessage: function() {
+            // Silently do nothing - this prevents errors in Facebook browser
+            return;
+          }
+        };
+        
+        // Add common handler names that might be accessed
+        ['bridge', 'native', 'app', 'webview'].forEach(function(name) {
+          if (!window.webkit.messageHandlers[name]) {
+            window.webkit.messageHandlers[name] = safeHandler;
+          }
+        });
+      }
+      
+      // Global error handler to catch and suppress webkit.messageHandlers errors
+      window.addEventListener('error', function(e) {
+        var errorMessage = e.message || (e.error && e.error.message) || '';
+        if (errorMessage.includes('webkit.messageHandlers') || 
+            errorMessage.includes('messageHandlers') ||
+            (e.filename && e.filename.includes('webkit'))) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Don't log to console in production to avoid noise
+          if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.warn('Suppressed webkit.messageHandlers error (Facebook browser compatibility)');
+          }
+          return false;
+        }
+      }, true);
+      
+      // Also catch unhandled promise rejections
+      window.addEventListener('unhandledrejection', function(e) {
+        var errorMessage = '';
+        if (e.reason) {
+          if (typeof e.reason === 'string') {
+            errorMessage = e.reason;
+          } else if (typeof e.reason === 'object' && e.reason.message) {
+            errorMessage = e.reason.message;
+          }
+        }
+        if (errorMessage.includes('webkit.messageHandlers') || 
+            errorMessage.includes('messageHandlers')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      });
+    })();
+  </script>
+
   <!-- Defer non-critical scripts to prevent render blocking -->
   <script>
     // Guard against undefined errors in in-app browsers
