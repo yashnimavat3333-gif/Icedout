@@ -21,6 +21,21 @@ import ProductReviews from "../Review";
 
 const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
 
+// ---------- Facebook/Instagram Browser Detection (Safe for in-app browsers) ----------
+const detectInAppBrowser = () => {
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') return { isInApp: false, isFacebook: false, isInstagram: false };
+  
+  const ua = navigator.userAgent || navigator.vendor || '';
+  const isFacebook = /FBAN|FBAV|FB_IAB|FB4A/i.test(ua);
+  const isInstagram = /Instagram/i.test(ua);
+  const isInApp = isFacebook || isInstagram;
+  
+  return { isInApp, isFacebook, isInstagram };
+};
+
+// Cache detection result (runs once, safe for performance)
+const browserInfo = typeof window !== 'undefined' ? detectInAppBrowser() : { isInApp: false, isFacebook: false, isInstagram: false };
+
 // ---------- Optimized Thumbnail (Images Only) ----------
 const ThumbMedia = React.memo(({ src, alt }) => {
   const [loaded, setLoaded] = useState(false);
@@ -71,11 +86,15 @@ const ThumbMedia = React.memo(({ src, alt }) => {
 ThumbMedia.displayName = "ThumbMedia";
 
 // ---------- Optimized Main Slide (Images Only) ----------
-const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, isFirst = false }) => {
+const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, onEnableZoom, isFirst = false }) => {
   const [loaded, setLoaded] = useState(false);
   const placeholder = "/placeholder-product.jpg";
 
   const handleOpen = () => {
+    // Enable zoom functionality on first interaction (lazy loading)
+    if (onEnableZoom) {
+      onEnableZoom();
+    }
     onOpenZoom?.();
   };
 
@@ -165,7 +184,8 @@ export default function ProductDetail() {
   // Defer rendering of gallery images to prevent initial render blocking
   const [renderAllImages, setRenderAllImages] = useState(false);
 
-  // Zoom modal state (mobile-friendly)
+  // Zoom modal state (mobile-friendly) - LAZY LOADED: Only initialized after user interaction
+  const [zoomEnabled, setZoomEnabled] = useState(false); // Lazy-load flag
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -181,6 +201,10 @@ export default function ProductDetail() {
     startScale: 1,
   });
   const lastTapRef = useRef(0);
+  
+  // Throttle refs for performance (critical for in-app browsers)
+  const touchThrottleRef = useRef(0);
+  const TOUCH_THROTTLE_MS = browserInfo.isInApp ? 32 : 16; // Slower updates in in-app browsers
 
   const { addToCart } = useCart();
   const navigate = useNavigate();
@@ -496,13 +520,32 @@ export default function ProductDetail() {
   );
 
 
-  // Zoom modal handlers
+  // Lazy-load zoom functionality: Only enable after first user interaction
+  const enableZoomOnInteraction = useCallback(() => {
+    if (!zoomEnabled) {
+      setZoomEnabled(true);
+    }
+  }, [zoomEnabled]);
+
+  // Zoom modal handlers - Only work after zoom is enabled
   const openZoom = useCallback(() => {
-    setZoomOpen(true);
-    setZoomScale(1);
-    setPan({ x: 0, y: 0 });
-    pinchRef.current = { initialDistance: 0, startScale: 1 };
-  }, []);
+    // Enable zoom on first use (lazy loading)
+    if (!zoomEnabled) {
+      setZoomEnabled(true);
+      // Use requestAnimationFrame to defer initialization until next frame
+      requestAnimationFrame(() => {
+        setZoomOpen(true);
+        setZoomScale(1);
+        setPan({ x: 0, y: 0 });
+        pinchRef.current = { initialDistance: 0, startScale: 1 };
+      });
+    } else {
+      setZoomOpen(true);
+      setZoomScale(1);
+      setPan({ x: 0, y: 0 });
+      pinchRef.current = { initialDistance: 0, startScale: 1 };
+    }
+  }, [zoomEnabled]);
 
   const closeZoom = useCallback(() => {
     setZoomOpen(false);
@@ -558,16 +601,29 @@ export default function ProductDetail() {
   };
 
   // touch handlers supporting pinch and single-finger pan and double-tap
+  // OPTIMIZED: Throttled and defensive for in-app browsers
   const onTouchStart = useCallback(
     (ev) => {
+      if (!zoomEnabled || !zoomOpen) return; // Only active when zoom is enabled and open
       if (!ev.touches) return;
+      
+      // Enable zoom on first interaction if not already enabled
+      enableZoomOnInteraction();
+      
+      // Disable pinch zoom in Facebook/Instagram browsers (risky for stability)
+      if (browserInfo.isInApp && ev.touches.length === 2) {
+        // In in-app browsers, disable pinch to prevent crashes
+        // Fall back to button-based zoom only
+        return;
+      }
+      
       if (ev.touches.length === 2) {
-        // start pinch
+        // start pinch (only in regular browsers)
         const d = getDistance(ev.touches[0], ev.touches[1]);
         pinchRef.current.initialDistance = d;
         pinchRef.current.startScale = zoomScale;
       } else if (ev.touches.length === 1) {
-        // double-tap to toggle zoom
+        // double-tap to toggle zoom (safe in all browsers)
         const now = Date.now();
         if (now - lastTapRef.current < 300) {
           // double tap
@@ -589,14 +645,28 @@ export default function ProductDetail() {
         }
       }
     },
-    [zoomScale, onPanStart]
+    [zoomScale, onPanStart, zoomEnabled, zoomOpen, enableZoomOnInteraction]
   );
 
   const onTouchMove = useCallback(
     (ev) => {
+      if (!zoomEnabled || !zoomOpen) return; // Only active when zoom is enabled and open
       if (!ev.touches) return;
+      
+      // Throttle touch move events for performance (critical for in-app browsers)
+      const now = Date.now();
+      if (now - touchThrottleRef.current < TOUCH_THROTTLE_MS) {
+        return; // Skip this frame
+      }
+      touchThrottleRef.current = now;
+      
+      // Disable pinch zoom in Facebook/Instagram browsers
+      if (browserInfo.isInApp && ev.touches.length === 2) {
+        return; // Prevent pinch in in-app browsers
+      }
+      
       if (ev.touches.length === 2) {
-        // pinch to zoom
+        // pinch to zoom (only in regular browsers)
         const d = getDistance(ev.touches[0], ev.touches[1]);
         const initial = pinchRef.current.initialDistance || d;
         const startScale = pinchRef.current.startScale || zoomScale;
@@ -607,7 +677,7 @@ export default function ProductDetail() {
         onPanMove(t.clientX, t.clientY);
       }
     },
-    [zoomScale, onPanMove]
+    [zoomScale, onPanMove, zoomEnabled, zoomOpen]
   );
 
   const onTouchEnd = useCallback(
@@ -647,15 +717,26 @@ export default function ProductDetail() {
   }, [onPanEnd]);
 
   // navigation functions for prev/next buttons and keyboard
+  // OPTIMIZED: Direct state updates (faster, no Swiper dependency for in-app browsers)
   const goPrev = useCallback(() => {
     const len = product?.processedMedia?.length || 0;
     if (len === 0) return; // No media to navigate
     
+    // In in-app browsers, use direct state updates (more reliable)
+    if (browserInfo.isInApp) {
+      setSelectedImage((i) => Math.max(0, i - 1));
+      return;
+    }
+    
+    // In regular browsers, try Swiper first, fallback to direct state
     if (mainSwiper && typeof mainSwiper.slidePrev === "function") {
       try {
         mainSwiper.slidePrev();
       } catch (e) {
-        console.warn("mainSwiper.slidePrev failed", e);
+        // Silent fallback - don't log in production
+        if (import.meta.env.DEV) {
+          console.warn("mainSwiper.slidePrev failed", e);
+        }
         setSelectedImage((i) => Math.max(0, i - 1));
       }
     } else {
@@ -667,11 +748,21 @@ export default function ProductDetail() {
     const len = product?.processedMedia?.length || 0;
     if (len === 0) return; // No media to navigate
     
+    // In in-app browsers, use direct state updates (more reliable)
+    if (browserInfo.isInApp) {
+      setSelectedImage((i) => Math.min(len - 1, i + 1));
+      return;
+    }
+    
+    // In regular browsers, try Swiper first, fallback to direct state
     if (mainSwiper && typeof mainSwiper.slideNext === "function") {
       try {
         mainSwiper.slideNext();
       } catch (e) {
-        console.warn("mainSwiper.slideNext failed", e);
+        // Silent fallback - don't log in production
+        if (import.meta.env.DEV) {
+          console.warn("mainSwiper.slideNext failed", e);
+        }
         setSelectedImage((i) => Math.min(len - 1, i + 1));
       }
     } else {
@@ -679,9 +770,32 @@ export default function ProductDetail() {
     }
   }, [mainSwiper, product]);
 
-  // keyboard controls while modal open
+  // Prevent body scroll when zoom modal is open (critical for mobile)
   useEffect(() => {
-    if (!zoomOpen) return;
+    if (!zoomEnabled || !zoomOpen) return;
+    
+    // Lock body scroll
+    const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    document.body.style.overflow = 'hidden';
+    // Use fixed positioning to prevent scroll on iOS
+    if (browserInfo.isInApp) {
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+    }
+    
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      if (browserInfo.isInApp) {
+        document.body.style.width = '';
+      }
+    };
+  }, [zoomEnabled, zoomOpen]);
+
+  // keyboard controls while modal open (desktop only, safe for all browsers)
+  useEffect(() => {
+    if (!zoomEnabled || !zoomOpen) return;
     const onKey = (e) => {
       if (e.key === "Escape") closeZoom();
       else if (e.key === "ArrowLeft") goPrev();
@@ -691,7 +805,7 @@ export default function ProductDetail() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [zoomOpen, closeZoom, goPrev, goNext, changeZoom]);
+  }, [zoomEnabled, zoomOpen, closeZoom, goPrev, goNext, changeZoom]);
 
   // memoized values
   const pricing = useMemo(
@@ -1313,25 +1427,35 @@ export default function ProductDetail() {
                       // Update Swiper after images are deferred to render
                       if (s && renderAllImages) {
                         requestAnimationFrame(() => {
-                          s.update();
+                          try {
+                            s.update();
+                          } catch (e) {
+                            // Silent fail for in-app browsers
+                            if (import.meta.env.DEV && !browserInfo.isInApp) {
+                              console.warn("Swiper update failed", e);
+                            }
+                          }
                         });
                       }
                     }}
                     slidesPerView={1}
                     spaceBetween={10}
                     className="h-full w-full"
-                    observer={renderAllImages} // Only observe after all images are rendered
-                    observeParents={renderAllImages}
+                    observer={renderAllImages && !browserInfo.isInApp} // Disable observer in in-app browsers (risky)
+                    observeParents={renderAllImages && !browserInfo.isInApp}
                     preloadImages={false}
                     lazy={{
                       enabled: true,
-                      loadPrevNext: true,
-                      loadPrevNextAmount: 1,
+                      loadPrevNext: !browserInfo.isInApp, // Disable preloading in in-app browsers
+                      loadPrevNextAmount: browserInfo.isInApp ? 0 : 1,
                     }}
-                    watchSlidesProgress={renderAllImages} // Only watch progress after initial render
+                    watchSlidesProgress={renderAllImages && !browserInfo.isInApp} // Disable in in-app browsers
                     onSlideChange={(swiper) => {
                       setSelectedImage(swiper.activeIndex);
                     }}
+                    // Disable animations in in-app browsers for stability
+                    speed={browserInfo.isInApp ? 0 : 300}
+                    effect={browserInfo.isInApp ? 'slide' : 'slide'} // Simple slide effect
                   >
                     {(renderAllImages 
                       ? product.processedMedia 
@@ -1345,6 +1469,7 @@ export default function ProductDetail() {
                             name={product.name}
                             isActive={selectedImage === index}
                             onOpenZoom={() => openZoom()}
+                            onEnableZoom={enableZoomOnInteraction}
                             isFirst={index === 0}
                           />
                         </SwiperSlide>
@@ -1412,8 +1537,9 @@ export default function ProductDetail() {
         {relatedProductsSection}
       </section>
 
-      {/* Zoom / Fullscreen Modal (mobile-friendly) */}
-      {zoomOpen && (
+      {/* Zoom / Fullscreen Modal (mobile-friendly) - LAZY LOADED */}
+      {/* Only render when zoom is enabled (after first user interaction) */}
+      {zoomEnabled && zoomOpen && (
         <div
           className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-2"
           onTouchStart={onTouchStart}
@@ -1421,6 +1547,8 @@ export default function ProductDetail() {
           onTouchEnd={onTouchEnd}
           onMouseMove={onMouseMove}
           onMouseUp={onMouseUp}
+          // Prevent body scroll when zoom is open
+          style={{ touchAction: 'none' }}
         >
           {/* top-right controls - hide range slider on small screens */}
           <div className="absolute top-4 right-4 flex items-center gap-2 z-40">
@@ -1432,16 +1560,18 @@ export default function ProductDetail() {
               −
             </button>
 
-            {/* slider visible on sm+ */}
-            <input
-              type="range"
-              min={0.5}
-              max={4}
-              step={0.01}
-              value={zoomScale}
-              onChange={onZoomSlider}
-              className="hidden sm:block w-44"
-            />
+            {/* slider visible on sm+ - Hidden in in-app browsers for stability */}
+            {!browserInfo.isInApp && (
+              <input
+                type="range"
+                min={0.5}
+                max={4}
+                step={0.01}
+                value={zoomScale}
+                onChange={onZoomSlider}
+                className="hidden sm:block w-44"
+              />
+            )}
 
             <button
               onClick={() => changeZoom(0.25)}
