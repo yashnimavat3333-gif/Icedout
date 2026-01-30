@@ -264,54 +264,10 @@
     }
   </script>
 
-  <!-- Microsoft Clarity - Deferred until after first interaction (prevents blocking) -->
-  <script type="text/javascript">
-    (function() {
-      // Guard against undefined errors in in-app browsers
-      if (typeof window === 'undefined' || typeof document === 'undefined') return;
-      
-      // Defer Clarity until after first user interaction or 3 seconds
-      var loadClarity = function() {
-        try {
-          (function(c,l,a,r,i,t,y){
-            if (typeof c === 'undefined' || typeof l === 'undefined') return;
-            c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-            t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-            y=l.getElementsByTagName(r)[0];
-            if (y && y.parentNode) {
-              y.parentNode.insertBefore(t,y);
-            }
-          })(window, document, "clarity", "script", "uynsdkk298");
-        } catch (e) {
-          // Silently fail - don't break the page
-        }
-      };
-      
-      // Load after first interaction (click, touch, scroll)
-      var interactionEvents = ['click', 'touchstart', 'scroll', 'keydown'];
-      var loaded = false;
-      var loadOnce = function() {
-        if (!loaded) {
-          loaded = true;
-          loadClarity();
-          interactionEvents.forEach(function(evt) {
-            document.removeEventListener(evt, loadOnce, { passive: true });
-          });
-        }
-      };
-      
-      interactionEvents.forEach(function(evt) {
-        document.addEventListener(evt, loadOnce, { passive: true, once: true });
-      });
-      
-      // Fallback: load after 3 seconds if no interaction
-      setTimeout(function() {
-        if (!loaded) {
-          loadClarity();
-          loaded = true;
-        }
-      }, 3000);
-    })();
+  <!-- DebugBear RUM - Real User Monitoring (async, non-blocking) -->
+  <!-- Loads immediately but async, does not block initial render or hero image -->
+  <script>
+    (function(){var dbpr=100;if(Math.random()*100>100-dbpr){var d="dbbRum",w=window,o=document,a=addEventListener,scr=o.createElement("script");scr.async=!0;w[d]=w[d]||[];w[d].push(["presampling",dbpr]);["error","unhandledrejection"].forEach(function(t){a(t,function(e){w[d].push([t,e])});});scr.src="https://cdn.debugbear.com/mGylJjrwEf9j.js";o.head.appendChild(scr);}})()
   </script>
 
   <!-- Hotjar - User behavior analytics (production only) -->
