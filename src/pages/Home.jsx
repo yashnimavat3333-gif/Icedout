@@ -21,10 +21,23 @@ function Home() {
       {/* Hero Image - Load immediately (above fold) */}
       <ImageCarousel />
 
-      {/* Static trust strip - directly below hero, no animation */}
-      <section className="w-full bg-gray-50 border-t border-b border-gray-100">
+      {/* Static trust strip - CLS Fix: Reserve fixed height */}
+      <section 
+        className="w-full bg-gray-50 border-t border-b border-gray-100"
+        style={{
+          // CLS Fix: Reserve minimum height to prevent layout shift
+          minHeight: '3rem',
+          height: 'auto'
+        }}
+      >
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm text-gray-900 font-medium md:flex md:items-center md:justify-center md:space-x-8">
+          <div 
+            className="grid grid-cols-2 gap-3 text-xs sm:text-sm text-gray-900 font-medium md:flex md:items-center md:justify-center md:space-x-8"
+            style={{
+              // CLS Fix: Reserve space for content
+              minHeight: '1.5rem'
+            }}
+          >
             <div className="flex items-center gap-2 justify-center md:justify-start">
               <span aria-hidden="true">✓</span>
               <span>Free Worldwide Shipping</span>

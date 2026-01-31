@@ -38,26 +38,37 @@ const ImageCarousel = () => {
 
   return (
     <div className="w-full mx-auto mt-0 shadow-md overflow-hidden relative">
-      {/* Fixed height container - prevents CLS on mobile using 100svh */}
-      {/* Facebook in-app browser fix: Use CSS classes instead of conditional JS styles */}
+      {/* Fixed height container - prevents CLS with explicit dimensions */}
+      {/* CLS Fix: Reserve space immediately with explicit aspect ratio */}
       <div 
         className="relative w-full hero-container-mobile lg:hero-container-desktop"
         style={{ 
-          // Mobile: Lock to viewport height to prevent CLS (works in Facebook browser)
+          // Mobile: Use viewport height but reserve space immediately
           minHeight: '100svh',
           height: '100svh',
+          // Explicit aspect ratio prevents CLS during image load
+          aspectRatio: '16/9',
           // Fallback background color (not black) if image fails to load
           backgroundColor: '#2a2a2a',
+          // Reserve space immediately - prevents layout shift
+          position: 'relative',
+          overflow: 'hidden'
         }}
       >
-        {/* Desktop height spacer (hidden on mobile) */}
+        {/* CLS Fix: Reserve space for desktop (hidden on mobile) */}
         <div 
-          className="hidden lg:block absolute inset-0" 
-          style={{ height: '700px', aspectRatio: '16/9' }} 
+          className="hidden lg:block absolute inset-0 pointer-events-none" 
+          style={{ 
+            height: '700px', 
+            aspectRatio: '16/9',
+            // Reserve space to prevent CLS
+            visibility: 'hidden'
+          }} 
+          aria-hidden="true"
         />
         
-        {/* Hero Image - LCP Element: Optimized with explicit dimensions */}
-        {/* Vite asset resolution: Public folder files are served from root */}
+        {/* Hero Image - LCP Element: Fixed dimensions prevent CLS */}
+        {/* CLS Fix: Explicit width/height match container aspect ratio */}
         <img
           src={heroImageSrc}
           alt="Premium Timepieces & Fine Jewellery"
@@ -68,17 +79,22 @@ const ImageCarousel = () => {
           fetchpriority="high"
           decoding="sync"
           style={{ 
+            // CLS Fix: Match container aspect ratio exactly
             aspectRatio: '16/9', 
             objectFit: 'cover',
-            // Prevent image reflow during load
-            minHeight: '100%',
-            minWidth: '100%',
+            // Reserve full container space immediately
+            width: '100%',
+            height: '100%',
             // Ensure image is visible (not hidden by default)
             opacity: 1,
             zIndex: 1,
             // Ensure image displays even if there are loading issues
             display: 'block',
-            visibility: 'visible'
+            visibility: 'visible',
+            // Prevent layout shift during load
+            position: 'absolute',
+            top: 0,
+            left: 0
           }}
           onError={(e) => {
             // Try alternative filename variations if first attempt fails
@@ -123,46 +139,56 @@ const ImageCarousel = () => {
           }}
         />
         
-        {/* Hero Content Overlay - ONE headline, ONE CTA */}
+        {/* Hero Content Overlay - CLS Fix: Reserve space for text */}
         <div 
           className="absolute inset-0 flex flex-col items-center justify-center px-4"
           style={{
             // Lighter gradient overlay to ensure hero image is visible
             backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.3), rgba(0,0,0,0.1), transparent)',
-            // Prevent text reflow during load
+            // CLS Fix: Reserve full container space immediately
+            width: '100%',
+            height: '100%',
             minHeight: '100%',
-            willChange: 'auto',
             // Ensure overlay is above image but doesn't block it
             zIndex: 2,
             // Ensure overlay doesn't prevent image from showing
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            // Prevent layout shift
+            position: 'absolute',
+            top: 0,
+            left: 0
           }}
         >
-          {/* ONE Main headline - fixed height prevents CLS */}
+          {/* CLS Fix: Reserve space for headline to prevent reflow */}
           <h1 
             className="text-2xl md:text-4xl lg:text-5xl font-light text-white text-center mb-4 max-w-4xl"
             style={{
-              // Lock height to prevent reflow
+              // CLS Fix: Reserve minimum height to prevent text reflow
               minHeight: '2.5rem',
-              lineHeight: '1.25'
+              lineHeight: '1.25',
+              // Reserve space even if text hasn't rendered
+              visibility: 'visible',
+              // Prevent layout shift during font load
+              fontDisplay: 'swap'
             }}
           >
             Hand-Set VVS Diamond Luxury Watches &amp; Jewellery
           </h1>
           
-          {/* ONE CTA - instant click, no delays */}
+          {/* CLS Fix: Reserve space for button */}
           <button
             onClick={handleCTAClick}
             className="px-6 py-3 bg-white text-gray-900 rounded-md hover:bg-gray-100 font-medium"
             style={{
-              // Ensure button is always visible and clickable
+              // CLS Fix: Reserve explicit height for button
               minHeight: '3rem',
+              height: '3rem',
               cursor: 'pointer',
               touchAction: 'manipulation',
-              // Prevent layout shift
-              willChange: 'auto',
               // Re-enable pointer events for button (overlay has pointerEvents: none)
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              // Prevent layout shift
+              flexShrink: 0
             }}
             aria-label="Explore our luxury collections"
           >

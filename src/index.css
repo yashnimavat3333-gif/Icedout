@@ -1,9 +1,18 @@
 @import "tailwindcss";
 
+/* CLS Fix: Font display strategy to prevent layout shift during font load */
+@font-face {
+  font-family: system-ui;
+  font-display: swap; /* Show fallback immediately, swap when font loads */
+}
+
 :root {
   padding: 0px;
   margin: -2px;
   background-color: #fff;
+  /* CLS Fix: Ensure system fonts load without layout shift */
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-display: swap;
 }
 
 /* Prevent CLS on mobile hero - lock viewport height */

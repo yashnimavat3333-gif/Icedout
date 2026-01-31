@@ -115,14 +115,34 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, onEnableZoom
       className="h-full w-full flex items-center justify-center p-0 cursor-zoom-in"
       onDoubleClick={handleOpen}
       onClick={handleOpen}
+      style={{
+        // CLS Fix: Reserve space immediately with explicit aspect ratio
+        aspectRatio: '1/1',
+        width: '100%',
+        height: '100%',
+        minHeight: '100%',
+        position: 'relative',
+        backgroundColor: '#f3f4f6' // Placeholder color
+      }}
     >
+      {/* CLS Fix: Always show placeholder to reserve space */}
+      {!loaded && (
+        <div 
+          className="absolute inset-0 bg-gray-100 animate-pulse"
+          style={{
+            aspectRatio: '1/1',
+            width: '100%',
+            height: '100%',
+            zIndex: 1
+          }}
+          aria-hidden="true"
+        />
+      )}
       {hasValidMedia ? (
         <img
           src={media.view}
           alt={name || "Product media"}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
-            loaded ? "opacity-100" : "opacity-0"
-          }`}
+          className="w-full h-full object-cover"
           onLoad={() => setLoaded(true)}
           onError={() => {
             setLoaded(true);
@@ -133,10 +153,19 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, onEnableZoom
           width={800}
           height={800}
           style={{
+            // CLS Fix: Reserve space with explicit dimensions
             aspectRatio: '1/1',
-            contain: 'layout style paint',
-            maxWidth: '100%',
-            maxHeight: '100%'
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            // Show immediately (no opacity transition to prevent CLS)
+            opacity: loaded ? 1 : 0,
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 2,
+            // Prevent layout shift
+            contain: 'layout style paint'
           }}
           sizes="(max-width: 1024px) 100vw, 50vw"
         />
@@ -150,10 +179,16 @@ const MediaSlide = React.memo(({ media, name, isActive, onOpenZoom, onEnableZoom
           width={800}
           height={800}
           style={{
+            // CLS Fix: Reserve space with explicit dimensions
             aspectRatio: '1/1',
-            contain: 'layout style paint',
-            maxWidth: '100%',
-            maxHeight: '100%'
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            zIndex: 2,
+            contain: 'layout style paint'
           }}
           sizes="(max-width: 1024px) 100vw, 50vw"
         />
@@ -1393,9 +1428,18 @@ export default function ProductDetail() {
     <>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
-          {/* Gallery */}
+          {/* Gallery - CLS Fix: Reserve space immediately */}
           <div className="lg:w-1/2">
-            <div className="relative aspect-square bg-gray-50 rounded-xl overflow-hidden">
+            <div 
+              className="relative bg-gray-50 rounded-xl overflow-hidden"
+              style={{
+                // CLS Fix: Reserve space immediately with explicit aspect ratio
+                aspectRatio: '1/1',
+                width: '100%',
+                minHeight: '100%',
+                position: 'relative'
+              }}
+            >
               {isClient && product.processedMedia && product.processedMedia.length > 0 ? (
                 <>
                   {/* Prev / Next Buttons (overlay) */}
@@ -1421,6 +1465,7 @@ export default function ProductDetail() {
                     </>
                   )}
 
+                  {/* CLS Fix: Reserve space for Swiper container */}
                   <Swiper
                     onSwiper={(s) => {
                       setMainSwiper(s);
@@ -1441,6 +1486,14 @@ export default function ProductDetail() {
                     slidesPerView={1}
                     spaceBetween={10}
                     className="h-full w-full"
+                    style={{
+                      // CLS Fix: Reserve space immediately with explicit aspect ratio
+                      aspectRatio: '1/1',
+                      width: '100%',
+                      height: '100%',
+                      minHeight: '100%',
+                      position: 'relative'
+                    }}
                     observer={renderAllImages && !browserInfo.isInApp} // Disable observer in in-app browsers (risky)
                     observeParents={renderAllImages && !browserInfo.isInApp}
                     preloadImages={false}

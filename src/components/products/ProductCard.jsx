@@ -218,25 +218,53 @@ const ProductCard = ({ product, isAboveFold = false }) => {
       className="block w-full h-full cursor-pointer group rounded-lg overflow-hidden shadow-sm hover:shadow-md transition"
       aria-label={`View ${product?.name || "product"} details`}
     >
-        {/* Image - Fixed aspect-ratio to prevent CLS, optimized dimensions for memory */}
-        <div className="relative bg-gray-100 overflow-hidden" style={{ aspectRatio: '2/3' }}>
-          {!loaded && (
-            <div className="absolute inset-0 animate-pulse bg-gray-200" style={{ aspectRatio: '2/3' }} />
-          )}
+        {/* Image - CLS Fix: Reserve space immediately with explicit dimensions */}
+        <div 
+          className="relative bg-gray-100 overflow-hidden" 
+          style={{ 
+            // CLS Fix: Reserve space immediately
+            aspectRatio: '2/3',
+            width: '100%',
+            position: 'relative'
+          }}
+        >
+          {/* CLS Fix: Always show placeholder to reserve space */}
+          <div 
+            className="absolute inset-0 bg-gray-200"
+            style={{ 
+              aspectRatio: '2/3',
+              width: '100%',
+              height: '100%',
+              zIndex: 1,
+              // Show placeholder immediately
+              opacity: loaded ? 0 : 1,
+              transition: 'opacity 0.2s'
+            }}
+            aria-hidden="true"
+          />
 
           <img
             src={imageSrc}
             alt={product?.name || "Product image"}
             width="400"
             height="600"
-            className={`h-full w-full object-cover transition-opacity duration-300 ${
-              loaded ? "opacity-100" : "opacity-0"
-            }`}
+            className="h-full w-full object-cover"
             loading={loadingStrategy}
             fetchPriority={fetchPriority}
             decoding={decodingStrategy}
             style={{ 
+              // CLS Fix: Reserve space with explicit dimensions
               aspectRatio: '2/3',
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              // Show immediately when loaded (no opacity transition to prevent CLS)
+              opacity: loaded ? 1 : 0,
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              zIndex: 2,
+              // Prevent layout shift
               contain: 'layout style paint',
               contentVisibility: 'auto'
             }}

@@ -460,17 +460,36 @@ const Header = () => {
         </div>
       </header>
 
-      {/* WhatsApp Floating Button - Delayed on product pages */}
-      {showWhatsApp && (
-        <div className="fixed bottom-6 right-6 z-40">
-          <a
-            href="https://wa.me/+917700921541" // Your WhatsApp number
-            target="_blank"
-            rel="noopener noreferrer"
-            className="bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-lg transition-all duration-300 flex items-center justify-center"
-            style={{ width: "56px", height: "56px" }}
-            aria-label="Chat on WhatsApp"
-          >
+      {/* WhatsApp Floating Button - CLS Fix: Reserve space to prevent layout shift */}
+      {/* Always render container to reserve space, only show button when ready */}
+      <div 
+        className="fixed bottom-6 right-6 z-40"
+        style={{
+          // CLS Fix: Reserve space immediately to prevent layout shift
+          width: "56px",
+          height: "56px",
+          // Reserve space even when button is hidden
+          visibility: showWhatsApp ? 'visible' : 'hidden',
+          // Prevent layout shift
+          position: 'fixed',
+          pointerEvents: showWhatsApp ? 'auto' : 'none'
+        }}
+      >
+        <a
+          href="https://wa.me/+917700921541" // Your WhatsApp number
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-lg transition-all duration-300 flex items-center justify-center"
+          style={{ 
+            width: "56px", 
+            height: "56px",
+            // CLS Fix: Ensure button doesn't cause layout shift
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          aria-label="Chat on WhatsApp"
+        >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -482,7 +501,6 @@ const Header = () => {
             </svg>
           </a>
         </div>
-      )}
     </>
   );
 };
