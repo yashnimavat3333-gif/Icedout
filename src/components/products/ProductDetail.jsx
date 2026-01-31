@@ -1037,7 +1037,7 @@ export default function ProductDetail() {
 
         <div className="flex space-x-4 pt-2">
           <button
-            className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
+            className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium"
             onClick={() => {
               if (product.size?.length && !selectedSize) {
                 alert("Please select a size before adding to cart.");
@@ -1066,7 +1066,7 @@ export default function ProductDetail() {
           </button>
 
           <button
-            className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors"
+            className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors font-medium"
             onClick={() => {
               if (product.size?.length && !selectedSize) {
                 alert("Please select a size before buying.");

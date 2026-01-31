@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Package,
+  MessageCircle,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
@@ -1493,6 +1494,27 @@ const CheckoutPage = () => {
                     </p>
                   )}
                 </div>
+                {/* Trust Badges & Delivery Info - Above price breakdown */}
+                <div className="mb-4 pb-4 border-b border-gray-200 space-y-2">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                    <Package className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-blue-900">Free Worldwide Shipping</p>
+                      <p className="text-xs text-blue-700">Estimated delivery: 5-6 business days</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
+                      <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                      <span className="text-xs font-medium text-gray-700">7-Day Returns</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-md border border-gray-200">
+                      <Lock className="w-3.5 h-3.5 text-blue-600" />
+                      <span className="text-xs font-medium text-gray-700">Secure Payment</span>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
                   <span>${subtotalAmount.toFixed(2)}</span>
@@ -1643,6 +1665,35 @@ const CheckoutPage = () => {
                       }`}
                       placeholder="USA"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Return/Refund Policy & WhatsApp Reassurance - Before Payment */}
+              <div className="border-t pt-6 mb-6 space-y-3">
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="flex items-start gap-2 mb-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">7-Day Easy Returns</p>
+                      <p className="text-xs text-gray-600 mt-0.5">Full refund if not satisfied. No questions asked.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">Authenticity Guarantee</p>
+                      <p className="text-xs text-gray-600 mt-0.5">100% authentic. Passes diamond tester verification.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 rounded-lg border border-green-100">
+                  <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900">Questions? We're here to help</p>
+                    <p className="text-xs text-green-700 mt-0.5">
+                      WhatsApp us at <a href="https://wa.me/+917700921541" target="_blank" rel="noopener noreferrer" className="font-semibold underline">+91 77009 21541</a> for instant support
+                    </p>
                   </div>
                 </div>
               </div>
