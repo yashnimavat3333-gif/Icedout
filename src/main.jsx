@@ -1,42 +1,53 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 import { Provider } from "react-redux";
 import store from "./store/store.js";
 import { RouterProvider, createBrowserRouter } from "react-router-dom";
-import Home from "./pages/Home.jsx";
-import { AuthLayout, Login } from "./components/index.js";
-
-import AddPost from "./pages/AddPost";
-import Signup from "./pages/Signup";
-import EditPost from "./pages/EditPost";
-
-import Post from "./pages/Post";
-
-import AllPosts from "./pages/AllPosts";
-import ProductDetail from "./components/products/ProductDetail.jsx";
-import ProductForm from "./components/form/ProductForm.jsx";
-import CategoryPage from "./pages/CategoryPage.jsx";
-import CategoriesPage from "./pages/CategoriesPage.jsx";
-import ProductList from "./components/products/ProductList.jsx";
-import About from "./pages/About.jsx";
-import Contact from "./pages/Contact.jsx";
-import CartPage from "./pages/CartPage.jsx";
 import { CartProvider } from "./context/CartContext.jsx";
-import SearchResults from "./components/SearchResults.jsx";
-import PrivacyPolicy from "./pages/PrivacyPolicy.jsx";
-import CreateCategoryForm from "./pages/CreateCategoryForm.jsx";
-import AdminProductPanel from "./components/Admin/AdminProductPanel.jsx";
-import EditProduct from "./pages/EditProduct.jsx";
-import NotFound from "./pages/NotFound.jsx";
-import CheckoutPage from "./pages/Checkout.jsx";
-import ProfilePage from "./pages/Profile.jsx";
-import OrderDetail from "./pages/OrderDetail.jsx";
-import AdminOrders from "./pages/AdminOrders.jsx";
-import AdminReviewPanel from "./pages/AdminReviews.jsx";
 import { loadGtag } from "./lib/analytics.js";
 import ErrorBoundary from "./components/ErrorBoundary.jsx";
+
+// Lazy load all routes for code splitting - reduces initial bundle size
+const Home = lazy(() => import("./pages/Home.jsx"));
+const AddPost = lazy(() => import("./pages/AddPost"));
+const Signup = lazy(() => import("./pages/Signup"));
+const EditPost = lazy(() => import("./pages/EditPost"));
+const Post = lazy(() => import("./pages/Post"));
+const AllPosts = lazy(() => import("./pages/AllPosts"));
+const ProductDetail = lazy(() => import("./components/products/ProductDetail.jsx"));
+const ProductForm = lazy(() => import("./components/form/ProductForm.jsx"));
+const CategoryPage = lazy(() => import("./pages/CategoryPage.jsx"));
+const CategoriesPage = lazy(() => import("./pages/CategoriesPage.jsx"));
+const ProductList = lazy(() => import("./components/products/ProductList.jsx"));
+const About = lazy(() => import("./pages/About.jsx"));
+const Contact = lazy(() => import("./pages/Contact.jsx"));
+const CartPage = lazy(() => import("./pages/CartPage.jsx"));
+const SearchResults = lazy(() => import("./components/SearchResults.jsx"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy.jsx"));
+const CreateCategoryForm = lazy(() => import("./pages/CreateCategoryForm.jsx"));
+const AdminProductPanel = lazy(() => import("./components/Admin/AdminProductPanel.jsx"));
+const EditProduct = lazy(() => import("./pages/EditProduct.jsx"));
+const NotFound = lazy(() => import("./pages/NotFound.jsx"));
+const CheckoutPage = lazy(() => import("./pages/Checkout.jsx"));
+const ProfilePage = lazy(() => import("./pages/Profile.jsx"));
+const OrderDetail = lazy(() => import("./pages/OrderDetail.jsx"));
+const AdminOrders = lazy(() => import("./pages/AdminOrders.jsx"));
+const AdminReviewPanel = lazy(() => import("./pages/AdminReviews.jsx"));
+
+// Import AuthLayout and Login normally (they're small and used frequently)
+import { AuthLayout, Login } from "./components/index.js";
+
+// Loading fallback component
+const RouteLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="animate-pulse text-center">
+      <div className="w-16 h-16 border-4 border-gray-200 border-t-gray-900 rounded-full mx-auto mb-4"></div>
+      <p className="text-sm text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
 
 const router = createBrowserRouter([
   {
@@ -45,135 +56,229 @@ const router = createBrowserRouter([
     children: [
       {
         path: "/",
-        element: <Home />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <Home />
+          </Suspense>
+        ),
       },
       {
         path: "/login",
         element: (
-          <AuthLayout authentication={false}>
-            <Login />
-          </AuthLayout>
+          <Suspense fallback={<RouteLoader />}>
+            <AuthLayout authentication={false}>
+              <Login />
+            </AuthLayout>
+          </Suspense>
         ),
       },
       {
         path: "/signup",
         element: (
-          <AuthLayout authentication={false}>
-            <Signup />
-          </AuthLayout>
+          <Suspense fallback={<RouteLoader />}>
+            <AuthLayout authentication={false}>
+              <Signup />
+            </AuthLayout>
+          </Suspense>
         ),
       },
       {
         path: "/all-posts",
         element: (
-          <AuthLayout authentication>
-            {" "}
-            <AllPosts />
-          </AuthLayout>
+          <Suspense fallback={<RouteLoader />}>
+            <AuthLayout authentication>
+              <AllPosts />
+            </AuthLayout>
+          </Suspense>
         ),
       },
       {
         path: "/add-post",
         element: (
-          <AuthLayout authentication>
-            {" "}
-            <AddPost />
-          </AuthLayout>
+          <Suspense fallback={<RouteLoader />}>
+            <AuthLayout authentication>
+              <AddPost />
+            </AuthLayout>
+          </Suspense>
         ),
       },
       {
         path: "/post/:slug",
-        element: <Post />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <Post />
+          </Suspense>
+        ),
       },
       {
         path: "/add-product",
-        element: <ProductForm />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <ProductForm />
+          </Suspense>
+        ),
       },
       {
         path: "/product/:id",
-        element: <ProductDetail />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <ProductDetail />
+          </Suspense>
+        ),
       },
-
       {
         path: "/edit-post/:slug",
         element: (
-          <AuthLayout authentication>
-            {" "}
-            <EditPost />
-          </AuthLayout>
+          <Suspense fallback={<RouteLoader />}>
+            <AuthLayout authentication>
+              <EditPost />
+            </AuthLayout>
+          </Suspense>
         ),
       },
       {
         path: "/categories",
-        element: <CategoriesPage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CategoriesPage />
+          </Suspense>
+        ),
       },
       {
         path: "/category/:categoryName",
-        element: <CategoryPage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CategoryPage />
+          </Suspense>
+        ),
       },
       {
         path: "/shop",
-        element: <ProductList />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <ProductList />
+          </Suspense>
+        ),
       },
       {
         path: "/collections",
-        element: <CategoriesPage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CategoriesPage />
+          </Suspense>
+        ),
       },
       {
         path: "/about",
-        element: <About />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <About />
+          </Suspense>
+        ),
       },
       {
         path: "/contact",
-        element: <Contact />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <Contact />
+          </Suspense>
+        ),
       },
       {
         path: "/cart",
-        element: <CartPage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CartPage />
+          </Suspense>
+        ),
       },
       {
         path: "/search",
-        element: <SearchResults />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <SearchResults />
+          </Suspense>
+        ),
       },
       {
         path: "/privacy",
-        element: <PrivacyPolicy />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <PrivacyPolicy />
+          </Suspense>
+        ),
       },
       {
         path: "/add-category",
-        element: <CreateCategoryForm />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CreateCategoryForm />
+          </Suspense>
+        ),
       },
       {
         path: "/admin",
-        element: <AdminProductPanel />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <AdminProductPanel />
+          </Suspense>
+        ),
       },
       {
         path: "/edit/:id",
-        element: <EditProduct />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <EditProduct />
+          </Suspense>
+        ),
       },
       {
         path: "/checkout",
-        element: <CheckoutPage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <CheckoutPage />
+          </Suspense>
+        ),
       },
       {
         path: "/profile",
-        element: <ProfilePage />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <ProfilePage />
+          </Suspense>
+        ),
       },
       {
         path: "/order/:id",
-        element: <OrderDetail />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <OrderDetail />
+          </Suspense>
+        ),
       },
       {
         path: "/admin-orders",
-        element: <AdminOrders />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <AdminOrders />
+          </Suspense>
+        ),
       },
       {
         path: "/admin-reviews",
-        element: <AdminReviewPanel />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <AdminReviewPanel />
+          </Suspense>
+        ),
       },
       {
         path: "*",
-        element: <NotFound />,
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <NotFound />
+          </Suspense>
+        ),
       },
     ],
   },
@@ -190,7 +295,10 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
       try {
         loadGtag();
       } catch (error) {
-        console.warn("Failed to load analytics:", error);
+        // Only log in development
+        if (import.meta.env.DEV) {
+          console.warn("Failed to load analytics:", error);
+        }
       }
     };
 
@@ -206,7 +314,10 @@ if (typeof window !== "undefined" && typeof document !== "undefined") {
       loadAnalyticsOnce();
     }, 5000);
   } catch (e) {
-    console.warn("Analytics init skipped:", e);
+    // Only log in development
+    if (import.meta.env.DEV) {
+      console.warn("Analytics init skipped:", e);
+    }
   }
 }
 

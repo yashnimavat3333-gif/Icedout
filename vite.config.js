@@ -15,11 +15,17 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-appwrite': ['appwrite'],
           'vendor-ui': ['@paypal/react-paypal-js', 'lucide-react'],
+          'vendor-editor': ['@tinymce/tinymce-react', 'tinymce', 'quill'],
+          'vendor-animation': ['framer-motion', 'gsap', 'lenis'],
         },
       },
     },
-    sourcemap: true, // Add source maps for debugging
+    // Disable source maps in production for better performance (saves ~4MB)
+    sourcemap: false,
+    // Optimize chunk size warnings
     chunkSizeWarningLimit: 1000,
+    // Use esbuild minification (faster, built-in)
+    minify: 'esbuild',
   },
   server: {
     port: 5173,
