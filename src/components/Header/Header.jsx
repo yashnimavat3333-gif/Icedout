@@ -476,7 +476,7 @@ const Header = () => {
         }}
       >
         <a
-          href="https://wa.me/+917700921541" // Your WhatsApp number
+          href="https://wa.me/+918850840154" // Your WhatsApp number
           target="_blank"
           rel="noopener noreferrer"
           className="bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-lg transition-all duration-300 flex items-center justify-center"

@@ -1692,7 +1692,7 @@ const CheckoutPage = () => {
                   <div className="flex-1">
                     <p className="text-sm font-medium text-green-900">Questions? We're here to help</p>
                     <p className="text-xs text-green-700 mt-0.5">
-                      WhatsApp us at <a href="https://wa.me/+917700921541" target="_blank" rel="noopener noreferrer" className="font-semibold underline">+91 77009 21541</a> for instant support
+                      WhatsApp us at <a href="https://wa.me/+918850840154" target="_blank" rel="noopener noreferrer" className="font-semibold underline">+91 88508 40154</a> for instant support
                     </p>
                   </div>
                 </div>
