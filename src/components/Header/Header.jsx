@@ -183,9 +183,25 @@ const Header = () => {
     <>
       <header
         className="w-full bg-white sticky top-0 z-50 border-b">
-        <div style={{ backgroundColor: 'white', textAlign: 'center', padding: '10px', fontWeight: 'bold' }}>
-  FREE WORLDWIDE SHIPPING / EASY PAYPAL PAYMENT PLANS AVAILABLE
-</div>
+        {/* CLS Fix: Reserve fixed height for announcement bar to prevent layout shift */}
+        <div 
+          style={{ 
+            backgroundColor: 'white', 
+            textAlign: 'center', 
+            padding: '10px', 
+            fontWeight: 'bold',
+            // CLS Fix: Reserve explicit height to prevent layout shift
+            minHeight: '2.5rem',
+            height: '2.5rem',
+            lineHeight: '1.25rem',
+            // Ensure text doesn't cause reflow
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
+          }}
+        >
+          FREE WORLDWIDE SHIPPING / EASY PAYPAL PAYMENT PLANS AVAILABLE
+        </div>
         
      
         {/* Desktop Header */}
@@ -460,19 +476,24 @@ const Header = () => {
         </div>
       </header>
 
-      {/* WhatsApp Floating Button - CLS Fix: Reserve space to prevent layout shift */}
-      {/* Always render container to reserve space, only show button when ready */}
+      {/* WhatsApp Floating Button - CRITICAL CLS Fix: Reserve space IMMEDIATELY */}
+      {/* Always reserve space to prevent cumulative layout shifts in Meta browsers */}
       <div 
         className="fixed bottom-6 right-6 z-40"
         style={{
-          // CLS Fix: Reserve space immediately to prevent layout shift
+          // CRITICAL CLS Fix: Always reserve space, even when hidden
           width: "56px",
           height: "56px",
-          // Reserve space even when button is hidden
-          visibility: showWhatsApp ? 'visible' : 'hidden',
-          // Prevent layout shift
+          // Use opacity instead of visibility to reserve space
+          opacity: showWhatsApp ? 1 : 0,
+          // Prevent interaction when hidden
+          pointerEvents: showWhatsApp ? 'auto' : 'none',
+          // Fixed position prevents layout shifts
           position: 'fixed',
-          pointerEvents: showWhatsApp ? 'auto' : 'none'
+          // Ensure container doesn't cause reflow
+          contain: 'layout style paint',
+          // Smooth transition without layout shift
+          transition: 'opacity 0.2s ease-in-out'
         }}
       >
         <a
@@ -483,10 +504,15 @@ const Header = () => {
           style={{ 
             width: "56px", 
             height: "56px",
-            // CLS Fix: Ensure button doesn't cause layout shift
+            // CRITICAL CLS Fix: Explicit dimensions prevent layout shift
+            minWidth: "56px",
+            minHeight: "56px",
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            // Prevent button from causing layout shifts
+            flexShrink: 0,
+            contain: 'layout style paint'
           }}
           aria-label="Chat on WhatsApp"
         >

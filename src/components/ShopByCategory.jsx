@@ -196,17 +196,46 @@ const ShopByCategory = () => {
                     )}`}
                     className="group relative block rounded-2xl overflow-hidden transition-all hover:-translate-y-2 hover:shadow-xl"
                   >
-                    <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" style={{ aspectRatio: '4/5' }}>
+                    {/* CLS Fix: Reserve space immediately with explicit dimensions */}
+                    <div 
+                      className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" 
+                      style={{ 
+                        aspectRatio: '4/5',
+                        width: '100%',
+                        position: 'relative',
+                        minHeight: '400px'
+                      }}
+                    >
+                      {/* CLS Fix: Placeholder to reserve space */}
+                      <div 
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          aspectRatio: '4/5',
+                          width: '100%',
+                          height: '100%',
+                          zIndex: 1
+                        }}
+                        aria-hidden="true"
+                      />
                       <img
                         src={cat.image || "/fallback.jpg"}
                         alt={`${cat.name} category`}
                         width="400"
                         height="500"
-                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700 absolute inset-0"
+                        className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
                         loading={cat.$id === categories[0]?.$id ? "eager" : "lazy"}
                         fetchPriority={cat.$id === categories[0]?.$id ? "high" : "auto"}
                         decoding={cat.$id === categories[0]?.$id ? "sync" : "async"}
-                        style={{ aspectRatio: '4/5' }}
+                        style={{ 
+                          aspectRatio: '4/5',
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          position: 'relative',
+                          zIndex: 2,
+                          // Prevent layout shift
+                          contain: 'layout style paint'
+                        }}
                       />
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />
@@ -245,18 +274,47 @@ const ShopByCategory = () => {
                     className="group relative block rounded-2xl overflow-hidden transition-all hover:-translate-y-2 hover:shadow-xl"
                     aria-label={`Browse ${cat.name} category`}
                   >
-                    <div className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" style={{ aspectRatio: '4/5' }}>
+                    {/* CLS Fix: Reserve space immediately with explicit dimensions */}
+                    <div 
+                      className="relative overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100" 
+                      style={{ 
+                        aspectRatio: '4/5',
+                        width: '100%',
+                        position: 'relative',
+                        minHeight: '400px'
+                      }}
+                    >
+                      {/* CLS Fix: Placeholder to reserve space */}
+                      <div 
+                        className="absolute inset-0 bg-gray-200"
+                        style={{
+                          aspectRatio: '4/5',
+                          width: '100%',
+                          height: '100%',
+                          zIndex: 1
+                        }}
+                        aria-hidden="true"
+                      />
                       {cat.image && (
                         <img
                           src={cat.image}
                           alt={`${cat.name} category`}
                           width="400"
                           height="500"
-                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700 absolute inset-0"
+                          className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700"
                           loading={cat.$id === categories[0]?.$id ? "eager" : "lazy"}
                           fetchPriority={cat.$id === categories[0]?.$id ? "high" : "auto"}
                           decoding={cat.$id === categories[0]?.$id ? "sync" : "async"}
-                          style={{ aspectRatio: '4/5' }}
+                          style={{ 
+                            aspectRatio: '4/5',
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            position: 'relative',
+                            zIndex: 2,
+                            // Prevent layout shift
+                            contain: 'layout style paint'
+                          }}
                         />
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent z-10" />

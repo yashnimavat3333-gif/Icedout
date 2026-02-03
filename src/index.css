@@ -1,9 +1,15 @@
 @import "tailwindcss";
 
-/* CLS Fix: Font display strategy to prevent layout shift during font load */
+/* CRITICAL CLS Fix: Font display strategy to prevent layout shift during font load */
+/* This prevents FOIT (Flash of Invisible Text) and FOUT (Flash of Unstyled Text) */
 @font-face {
   font-family: system-ui;
   font-display: swap; /* Show fallback immediately, swap when font loads */
+}
+
+/* CRITICAL: Ensure ALL fonts use swap to prevent CLS */
+* {
+  font-display: swap;
 }
 
 :root {
@@ -47,13 +53,41 @@
   background-repeat: no-repeat;
 }
 
-/* Facebook in-app browser specific fixes */
+/* CRITICAL: Meta in-app browser (Instagram + Facebook) specific fixes */
 @supports (-webkit-touch-callout: none) {
-  /* iOS/Facebook browser specific */
+  /* iOS/Meta browser specific - prevent viewport shifts */
   .hero-container-mobile {
-    min-height: 100vh; /* Fallback for Facebook browser */
+    min-height: 100vh; /* Fallback for Meta browser */
     height: 100vh;
   }
+  
+  /* Prevent Meta browser injected elements from causing CLS */
+  body {
+    /* Reserve space for potential Meta browser UI elements */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  /* Prevent Meta browser address bar from causing viewport shifts */
+  @media (max-width: 768px) {
+    html {
+      /* Lock viewport height to prevent address bar shifts */
+      height: -webkit-fill-available;
+    }
+    
+    body {
+      min-height: 100vh;
+      min-height: -webkit-fill-available;
+    }
+  }
+}
+
+/* CRITICAL: Prevent Meta browser injected scripts from causing layout shifts */
+/* Meta browsers inject elements that can cause CLS - isolate them */
+[data-meta-injected],
+iframe[src*="facebook"],
+iframe[src*="instagram"] {
+  contain: layout style paint;
+  will-change: auto;
 }
 
 .container {

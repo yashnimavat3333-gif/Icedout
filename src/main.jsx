@@ -39,12 +39,42 @@ const AdminReviewPanel = lazy(() => import("./pages/AdminReviews.jsx"));
 // Import AuthLayout and Login normally (they're small and used frequently)
 import { AuthLayout, Login } from "./components/index.js";
 
-// Loading fallback component
+// Loading fallback component - CLS Fix: Reserve space immediately
 const RouteLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-white">
-    <div className="animate-pulse text-center">
-      <div className="w-16 h-16 border-4 border-gray-200 border-t-gray-900 rounded-full mx-auto mb-4"></div>
-      <p className="text-sm text-gray-600">Loading...</p>
+  <div 
+    className="min-h-screen flex items-center justify-center bg-white"
+    style={{
+      // CLS Fix: Reserve explicit height to prevent layout shift
+      minHeight: '100vh',
+      height: '100vh',
+      // Prevent layout shift during route transition
+      contain: 'layout style paint'
+    }}
+  >
+    <div 
+      className="animate-pulse text-center"
+      style={{
+        // CLS Fix: Reserve space for loader
+        minHeight: '5rem',
+        minWidth: '10rem'
+      }}
+    >
+      <div 
+        className="w-16 h-16 border-4 border-gray-200 border-t-gray-900 rounded-full mx-auto mb-4"
+        style={{
+          // CLS Fix: Explicit dimensions prevent shift
+          width: '4rem',
+          height: '4rem',
+          flexShrink: 0
+        }}
+      ></div>
+      <p 
+        className="text-sm text-gray-600"
+        style={{
+          // CLS Fix: Reserve height for text
+          minHeight: '1.25rem'
+        }}
+      >Loading...</p>
     </div>
   </div>
 );

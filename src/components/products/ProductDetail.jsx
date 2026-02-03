@@ -955,17 +955,34 @@ export default function ProductDetail() {
           ) : null}
         </div>
 
-        {/* Real-Time Social Proof Indicators */}
-        <div className="mt-3 space-y-2">
-          <div className="flex items-center text-xs text-gray-600">
+        {/* Real-Time Social Proof Indicators - CLS Fix: Reserve space */}
+        <div 
+          className="mt-3 space-y-2"
+          style={{
+            // CLS Fix: Reserve minimum height to prevent layout shift
+            minHeight: '4.5rem',
+            // Prevent layout shift during content load
+            contain: 'layout style'
+          }}
+        >
+          <div 
+            className="flex items-center text-xs text-gray-600"
+            style={{ minHeight: '1.5rem' }}
+          >
             <span className="mr-1.5">🔥</span>
             <span>{socialProofData.viewsToday} people viewed this product today</span>
           </div>
-          <div className="flex items-center text-xs text-gray-600">
+          <div 
+            className="flex items-center text-xs text-gray-600"
+            style={{ minHeight: '1.5rem' }}
+          >
             <span className="mr-1.5">📍</span>
             <span>Recently ordered from {socialProofData.recentState}</span>
           </div>
-          <div className="flex items-center text-xs text-gray-600">
+          <div 
+            className="flex items-center text-xs text-gray-600"
+            style={{ minHeight: '1.5rem' }}
+          >
             <span className="mr-1.5">⏳</span>
             <span>Only {socialProofData.stockLeft} left in ready stock</span>
           </div>
@@ -1070,9 +1087,27 @@ export default function ProductDetail() {
           </div>
         </div>
 
-        <div className="flex space-x-4 pt-2">
+        {/* CLS Fix: Reserve space for buttons to prevent layout shift */}
+        <div 
+          className="flex space-x-4 pt-2"
+          style={{
+            // CLS Fix: Reserve explicit height for button container
+            minHeight: '3.5rem',
+            // Prevent layout shift
+            contain: 'layout style'
+          }}
+        >
           <button
             className="flex-1 py-3 px-6 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors font-medium"
+            style={{
+              // CLS Fix: Explicit dimensions prevent button from shifting
+              minHeight: '3rem',
+              height: '3rem',
+              flexShrink: 0,
+              // Prevent layout shift
+              contain: 'layout style paint',
+              touchAction: 'manipulation'
+            }}
             onClick={() => {
               if (product.size?.length && !selectedSize) {
                 alert("Please select a size before adding to cart.");
@@ -1102,6 +1137,15 @@ export default function ProductDetail() {
 
           <button
             className="flex-1 py-3 px-6 border border-gray-900 text-gray-900 rounded-md hover:bg-gray-50 transition-colors font-medium"
+            style={{
+              // CLS Fix: Explicit dimensions prevent button from shifting
+              minHeight: '3rem',
+              height: '3rem',
+              flexShrink: 0,
+              // Prevent layout shift
+              contain: 'layout style paint',
+              touchAction: 'manipulation'
+            }}
             onClick={() => {
               if (product.size?.length && !selectedSize) {
                 alert("Please select a size before buying.");
