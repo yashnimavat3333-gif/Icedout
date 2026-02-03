@@ -867,6 +867,19 @@ const CheckoutPage = () => {
         appliedCoupon
       );
 
+      // Track Meta Pixel Purchase event after successful order save
+      // Only fire if order was successfully saved to database
+      if (savedOrder && savedOrder.$id) {
+        try {
+          if (typeof window.trackMetaPixelPurchase === 'function') {
+            window.trackMetaPixelPurchase(finalAmount || 0, 'USD');
+          }
+        } catch (e) {
+          // Silently fail - do not break order flow
+          console.warn('Meta Pixel Purchase tracking failed:', e);
+        }
+      }
+
       setCompletedOrder({
         ...savedOrder,
         paypalOrderId: order.id,

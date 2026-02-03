@@ -78,9 +78,11 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link rel="preconnect" href="https://fra.cloud.appwrite.io">
   <link rel="preconnect" href="https://cdn.debugbear.com" crossorigin>
+  <link rel="preconnect" href="https://connect.facebook.net" crossorigin>
   <link rel="dns-prefetch" href="https://www.googletagmanager.com">
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="https://cdn.debugbear.com">
+  <link rel="dns-prefetch" href="https://connect.facebook.net">
   
 
   <!-- CRITICAL: Global error handler for Meta in-app browsers (Instagram + Facebook) -->
@@ -235,6 +237,80 @@
           }, { once: true });
         }
       }
+    })();
+  </script>
+
+  <!-- Meta Pixel - Iceyout Main Pixel (ID: 2057245685052975) -->
+  <!-- Loaded asynchronously, safe for Meta in-app browsers, no CLS -->
+  <script>
+    (function() {
+      'use strict';
+      if (typeof window === 'undefined') return;
+      
+      // CRITICAL: Defensive guard against webkit.messageHandlers errors
+      // Meta Pixel may access webkit APIs in Meta browsers
+      try {
+        // Ensure webkit.messageHandlers exists (already set by previous script)
+        if (!window.webkit) window.webkit = {};
+        if (!window.webkit.messageHandlers) window.webkit.messageHandlers = {};
+      } catch (e) {
+        // Silently continue
+      }
+      
+      // Meta Pixel base code - async load, no blocking
+      var pixelId = '2057245685052975';
+      
+      // Initialize fbq queue immediately (before script loads)
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      
+      // Track PageView immediately after fbq is initialized
+      try {
+        if (typeof window.fbq === 'function') {
+          window.fbq('init', pixelId);
+          window.fbq('track', 'PageView');
+        }
+      } catch (e) {
+        // Silently fail - Pixel will retry on next page load
+      }
+      
+      // CRITICAL: Global Purchase tracking helper function
+      // Call this function AFTER successful order completion
+      window.trackMetaPixelPurchase = function(value, currency) {
+        try {
+          // Guard against fbq being undefined
+          if (typeof window.fbq !== 'function') {
+            // Queue the event if fbq not ready yet
+            if (!window.fbq) {
+              window.fbq = function() {
+                (window.fbq.q = window.fbq.q || []).push(arguments);
+              };
+            }
+          }
+          
+          // Validate inputs
+          var purchaseValue = typeof value === 'number' && value > 0 ? value : 0;
+          var purchaseCurrency = typeof currency === 'string' && currency.length > 0 ? currency : 'USD';
+          
+          // Track Purchase event
+          window.fbq('track', 'Purchase', {
+            value: purchaseValue,
+            currency: purchaseCurrency
+          });
+        } catch (e) {
+          // Silently fail - do not break order flow
+          // Only log in development
+          if (window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            console.warn('Meta Pixel Purchase tracking failed:', e);
+          }
+        }
+      };
     })();
   </script>
 
