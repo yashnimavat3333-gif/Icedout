@@ -9,8 +9,16 @@ export default defineConfig({
     tailwindcss(),
   ],
   build: {
+    // Assets directory for hashed files (default: 'assets')
+    // Vite automatically adds content hashes to filenames for cache busting
+    assetsDir: 'assets',
     rollupOptions: {
       output: {
+        // Content hashing is enabled by default for cache optimization
+        // Format: [name]-[hash].[ext] (e.g., index-abc123.js)
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         manualChunks: {
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
           'vendor-appwrite': ['appwrite'],
