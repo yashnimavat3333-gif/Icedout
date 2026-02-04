@@ -227,6 +227,27 @@ const CheckoutPage = () => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // Track Meta Pixel InitiateCheckout event when checkout page loads
+  // Use ref to ensure it only fires once per session (not on refresh)
+  const checkoutTrackedRef = useRef(false);
+  useEffect(() => {
+    // Only track once when checkout page loads with items in cart
+    if (cartItems.length > 0 && !checkoutTrackedRef.current) {
+      checkoutTrackedRef.current = true;
+      try {
+        if (typeof window.trackMetaPixelInitiateCheckout === 'function') {
+          const totalValue = subtotalAmount || 0;
+          const productIds = cartItems.map(item => item.$id || item.id || '').filter(Boolean);
+          window.trackMetaPixelInitiateCheckout(totalValue, 'USD', cartItems.length, productIds);
+        }
+      } catch (e) {
+        // Silently fail - do not break checkout page
+        console.warn('Meta Pixel InitiateCheckout tracking failed:', e);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
 
   // initialize EmailJS (client-side)
   useEffect(() => {
@@ -872,7 +893,18 @@ const CheckoutPage = () => {
       if (savedOrder && savedOrder.$id) {
         try {
           if (typeof window.trackMetaPixelPurchase === 'function') {
-            window.trackMetaPixelPurchase(finalAmount || 0, 'USD');
+            // Build product data arrays for Purchase event
+            const productIds = cartItems.map(item => item.$id || item.id || '').filter(Boolean);
+            const productNames = cartItems.map(item => item.name || '').filter(Boolean);
+            const productQuantities = cartItems.map(item => item.quantity || 1);
+            
+            window.trackMetaPixelPurchase(
+              finalAmount || 0,
+              'USD',
+              productIds,
+              productNames,
+              productQuantities
+            );
           }
         } catch (e) {
           // Silently fail - do not break order flow

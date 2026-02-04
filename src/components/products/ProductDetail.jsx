@@ -459,6 +459,20 @@ export default function ProductDetail() {
           const firstInStock = (fullDoc.variations || []).findIndex(isInStock);
           setSelectedVarIndex(firstInStock >= 0 ? firstInStock : 0);
         }
+        
+        // Track Meta Pixel ViewContent event when product loads
+        try {
+          if (typeof window.trackMetaPixelViewContent === 'function' && fullDoc) {
+            const productPrice = Number(fullDoc.price) || 0;
+            const productId = fullDoc.$id || fullDoc.id || id;
+            const productName = fullDoc.name || '';
+            const productCategory = fullDoc.categories || fullDoc.category || '';
+            window.trackMetaPixelViewContent(productId, productName, productPrice, 'USD', productCategory);
+          }
+        } catch (e) {
+          // Silently fail - do not break product page
+          console.warn('Meta Pixel ViewContent tracking failed:', e);
+        }
       } catch (err) {
         console.error("Error fetching product:", err);
         setError("Failed to load product. Please try again.");
@@ -1122,12 +1136,28 @@ export default function ProductDetail() {
                   "Are you sure you want to add this item to your cart?"
                 )
               ) {
-                addToCart({
+                const cartItem = {
                   ...product,
                   pricing: getDisplayPricing(product, selectedVarIndex),
                   selectedVariation: activeVariation,
                   selectedSize: selectedSize || null,
-                });
+                };
+                
+                // Track Meta Pixel AddToCart event BEFORE adding to cart
+                try {
+                  if (typeof window.trackMetaPixelAddToCart === 'function') {
+                    const productId = product.$id || product.id || id;
+                    const productName = product.name || '';
+                    const productPrice = pricing?.price || product.price || 0;
+                    const productCategory = product.categories || product.category || '';
+                    window.trackMetaPixelAddToCart(productId, productName, productPrice, 'USD', 1, productCategory);
+                  }
+                } catch (e) {
+                  // Silently fail - do not break add to cart flow
+                  console.warn('Meta Pixel AddToCart tracking failed:', e);
+                }
+                
+                addToCart(cartItem);
                 navigate("/cart");
               }
             }}

@@ -83,6 +83,13 @@ export const CartProvider = ({ children }) => {
     setCart((prev) => {
       const key = item.$id ?? item.id;
       const exists = prev.find((p) => (p.$id ?? p.id) === key);
+      const newQuantity = exists 
+        ? Math.max(1, (exists.quantity || 1) + (item.quantity || 1))
+        : (item.quantity || 1);
+      
+      // Note: AddToCart tracking is handled in ProductDetail.jsx when user clicks button
+      // This ensures it only fires once per user action, not on every cart update
+      
       if (exists) {
         return prev.map((p) =>
           (p.$id ?? p.id) === key
@@ -92,7 +99,7 @@ export const CartProvider = ({ children }) => {
                 price: Number.isFinite(Number(item.price))
                   ? item.price
                   : p.price,
-                quantity: Math.max(1, (p.quantity || 1) + (item.quantity || 1)),
+                quantity: newQuantity,
                 // preserve other fields, but prefer new image if provided
                 image: item.image || p.image,
                 // keep rest of existing fields (variant etc.)

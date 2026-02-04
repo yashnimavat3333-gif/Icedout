@@ -280,32 +280,103 @@
         // Silently fail - Pixel will retry on next page load
       }
       
-      // CRITICAL: Global Purchase tracking helper function
-      // Call this function AFTER successful order completion
-      window.trackMetaPixelPurchase = function(value, currency) {
-        try {
-          // Guard against fbq being undefined
-          if (typeof window.fbq !== 'function') {
-            // Queue the event if fbq not ready yet
-            if (!window.fbq) {
-              window.fbq = function() {
-                (window.fbq.q = window.fbq.q || []).push(arguments);
-              };
-            }
+      // CRITICAL: Meta Pixel event tracking helper functions
+      // Safe wrappers that queue events if Pixel not loaded yet
+      
+      // Helper: Ensure fbq exists (queue if not ready)
+      function ensureFbq() {
+        if (typeof window.fbq !== 'function') {
+          if (!window.fbq) {
+            window.fbq = function() {
+              (window.fbq.q = window.fbq.q || []).push(arguments);
+            };
           }
-          
-          // Validate inputs
-          var purchaseValue = typeof value === 'number' && value > 0 ? value : 0;
-          var purchaseCurrency = typeof currency === 'string' && currency.length > 0 ? currency : 'USD';
-          
-          // Track Purchase event
-          window.fbq('track', 'Purchase', {
-            value: purchaseValue,
-            currency: purchaseCurrency
-          });
+        }
+      }
+      
+      // ViewContent: Track when product page is viewed
+      window.trackMetaPixelViewContent = function(productId, productName, value, currency, category) {
+        try {
+          ensureFbq();
+          var params = {
+            content_ids: [String(productId || '')],
+            content_name: String(productName || ''),
+            content_type: 'product',
+            currency: String(currency || 'USD'),
+            value: typeof value === 'number' && value > 0 ? value : 0
+          };
+          if (category) params.content_category = String(category);
+          window.fbq('track', 'ViewContent', params);
         } catch (e) {
-          // Silently fail - do not break order flow
-          // Only log in development
+          if (window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            console.warn('Meta Pixel ViewContent tracking failed:', e);
+          }
+        }
+      };
+      
+      // AddToCart: Track when item is added to cart
+      window.trackMetaPixelAddToCart = function(productId, productName, value, currency, quantity, category) {
+        try {
+          ensureFbq();
+          var params = {
+            content_ids: [String(productId || '')],
+            content_name: String(productName || ''),
+            content_type: 'product',
+            currency: String(currency || 'USD'),
+            value: typeof value === 'number' && value > 0 ? value : 0,
+            num_items: typeof quantity === 'number' && quantity > 0 ? quantity : 1
+          };
+          if (category) params.content_category = String(category);
+          window.fbq('track', 'AddToCart', params);
+        } catch (e) {
+          if (window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            console.warn('Meta Pixel AddToCart tracking failed:', e);
+          }
+        }
+      };
+      
+      // InitiateCheckout: Track when checkout page loads
+      window.trackMetaPixelInitiateCheckout = function(value, currency, numItems, contentIds) {
+        try {
+          ensureFbq();
+          var params = {
+            currency: String(currency || 'USD'),
+            value: typeof value === 'number' && value > 0 ? value : 0,
+            num_items: typeof numItems === 'number' && numItems > 0 ? numItems : 0
+          };
+          if (Array.isArray(contentIds) && contentIds.length > 0) {
+            params.content_ids = contentIds.map(function(id) { return String(id); });
+          }
+          window.fbq('track', 'InitiateCheckout', params);
+        } catch (e) {
+          if (window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+            console.warn('Meta Pixel InitiateCheckout tracking failed:', e);
+          }
+        }
+      };
+      
+      // Purchase: Track completed purchase (enhanced with product data)
+      window.trackMetaPixelPurchase = function(value, currency, contentIds, contentNames, quantities) {
+        try {
+          ensureFbq();
+          var params = {
+            currency: String(currency || 'USD'),
+            value: typeof value === 'number' && value > 0 ? value : 0
+          };
+          if (Array.isArray(contentIds) && contentIds.length > 0) {
+            params.content_ids = contentIds.map(function(id) { return String(id); });
+          }
+          if (Array.isArray(contentNames) && contentNames.length > 0) {
+            params.contents = contentNames.map(function(name, idx) {
+              return {
+                id: String(contentIds && contentIds[idx] ? contentIds[idx] : ''),
+                quantity: typeof quantities === 'number' ? quantities : (Array.isArray(quantities) && quantities[idx] ? quantities[idx] : 1),
+                item_price: value / (Array.isArray(quantities) ? quantities.reduce(function(a, b) { return a + b; }, 0) : 1)
+              };
+            });
+          }
+          window.fbq('track', 'Purchase', params);
+        } catch (e) {
           if (window.location && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
             console.warn('Meta Pixel Purchase tracking failed:', e);
           }
