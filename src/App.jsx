@@ -5,6 +5,7 @@ import authService from "./appwrite/auth";
 import { login, logout } from "./store/authSlice";
 import { Footer, Header } from "./components";
 import { Outlet } from "react-router-dom";
+import WhatsAppFloatingButton from "./components/WhatsAppFloatingButton.jsx";
 // ReactLenis disabled to prevent performance issues and periodic freezes
 
 function App() {
@@ -68,6 +69,8 @@ function App() {
         <Outlet />
       </main>
       <Footer />
+      {/* Global WhatsApp CTA - fixed overlay, CLS-safe */}
+      <WhatsAppFloatingButton />
     </div>
   );
 }
