@@ -1,16 +1,27 @@
 import React from "react";
+import { useLocation } from "react-router-dom";
 
 // Primary WhatsApp configuration
 const WHATSAPP_PHONE = "+918850840154";
 const WHATSAPP_MESSAGE =
-  "Hi Iceyout, I’m interested in your jewelry. I saw your website and want the 10% offer.";
+  "Hi Iceyout, I'm interested in your jewelry. I saw your website and want the 10% offer.";
 
 // Normalize phone for wa.me (digits only) while keeping source readable
 const WHATSAPP_PHONE_DIGITS = WHATSAPP_PHONE.replace(/[^\d]/g, "");
 const WHATSAPP_ENCODED_MESSAGE = encodeURIComponent(WHATSAPP_MESSAGE);
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE_DIGITS}?text=${WHATSAPP_ENCODED_MESSAGE}`;
 
+// Pages where the floating button should be hidden
+const HIDDEN_ROUTES = ["/checkout"];
+
 function WhatsAppFloatingButton() {
+  const { pathname } = useLocation();
+
+  // Hide on checkout (and any other sensitive pages)
+  if (HIDDEN_ROUTES.some((r) => pathname.startsWith(r))) {
+    return null;
+  }
+
   return (
     <>
       {/* Scoped, component-local styles (no global impact) */}

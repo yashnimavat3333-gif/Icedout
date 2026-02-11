@@ -196,6 +196,11 @@ export default function AdminOrders() {
 
     setLoading(true);
     try {
+      if (!window.Appwrite || !window.Appwrite.Query) {
+        setError("Appwrite SDK not available. Please reload the page.");
+        setLoading(false);
+        return;
+      }
       const { Query } = window.Appwrite;
       const queries = [Query.orderDesc("$createdAt"), Query.limit(pageSize)];
 

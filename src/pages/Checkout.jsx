@@ -7,7 +7,6 @@ import {
   AlertCircle,
   ArrowLeft,
   Package,
-  MessageCircle,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
@@ -384,10 +383,11 @@ const CheckoutPage = () => {
     };
   }, [appliedCoupon, subtotalAmount]);
 
-  // Render PayPal buttons when SDK loaded, form valid, and ref present
+  // Render PayPal buttons immediately when SDK loads (no form-valid gate)
+  // Validation is enforced inside createOrder so users see buttons right away
   useEffect(() => {
     let mounted = true;
-    if (!paypalLoaded || !isFormValid || !paypalRef.current || !window.paypal) {
+    if (!paypalLoaded || !paypalRef.current || !window.paypal) {
       return;
     }
 
@@ -395,6 +395,54 @@ const CheckoutPage = () => {
 
     const buttons = window.paypal.Buttons({
       createOrder: (data, actions) => {
+        // ── Validate shipping form BEFORE creating the PayPal order ──
+        const emailOk = !!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+        const fieldsOk =
+          formData.fullName.trim() &&
+          formData.phone.trim() &&
+          formData.address.trim() &&
+          formData.city.trim() &&
+          formData.zipCode.trim() &&
+          formData.country.trim();
+        const hasItems = cartItems.length > 0;
+
+        if (!emailOk || !fieldsOk || !hasItems) {
+          // Build a user-friendly message
+          const missing = [];
+          if (!hasItems) missing.push("items in cart");
+          if (!formData.fullName.trim()) missing.push("full name");
+          if (!emailOk) missing.push("valid email");
+          if (!formData.phone.trim()) missing.push("phone number");
+          if (!formData.address.trim()) missing.push("address");
+          if (!formData.city.trim()) missing.push("city");
+          if (!formData.zipCode.trim()) missing.push("zip code");
+          if (!formData.country.trim()) missing.push("country");
+
+          setOrderStatus({
+            type: "error",
+            message: `Please complete: ${missing.join(", ")}`,
+          });
+
+          // Scroll to the first empty field for convenience
+          try {
+            const firstEmpty = document.querySelector(
+              'input:invalid, input[value=""], select[value=""]'
+            );
+            if (firstEmpty) {
+              firstEmpty.scrollIntoView({ behavior: "smooth", block: "center" });
+              firstEmpty.focus();
+            }
+          } catch (e) { /* silent */ }
+
+          // Reject to abort PayPal popup
+          return Promise.reject(new Error("Shipping info incomplete"));
+        }
+
+        // Clear any previous validation error
+        if (orderStatus?.type === "error" && orderStatus?.message?.startsWith("Please complete")) {
+          setOrderStatus(null);
+        }
+
         return actions.order.create({
           purchase_units: [
             {
@@ -417,6 +465,10 @@ const CheckoutPage = () => {
         }
       },
       onError: (err) => {
+        // Don't show error for intentional validation rejections
+        if (err && String(err.message || err).indexOf("Shipping info incomplete") !== -1) {
+          return;
+        }
         console.error("PayPal error:", err);
         setOrderStatus({
           type: "error",
@@ -427,6 +479,10 @@ const CheckoutPage = () => {
 
     buttons.render(paypalRef.current).catch((err) => {
       if (!mounted) return;
+      // Suppress expected validation-abort errors
+      if (err && String(err.message || err).indexOf("Shipping info incomplete") !== -1) {
+        return;
+      }
       console.error("PayPal Buttons render failed:", err);
       setOrderStatus({
         type: "error",
@@ -439,7 +495,7 @@ const CheckoutPage = () => {
       if (paypalRef.current) paypalRef.current.innerHTML = "";
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paypalLoaded, isFormValid, finalAmount, cartItems.length]);
+  }, [paypalLoaded, finalAmount, cartItems.length]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -1011,6 +1067,7 @@ const CheckoutPage = () => {
         }
       }
 
+      if (!window.Appwrite || !window.Appwrite.Query) return;
       const { Query } = window.Appwrite;
 
       if (appwriteUserId) {
@@ -1064,6 +1121,9 @@ const CheckoutPage = () => {
         return { ok: false, reason: "Service unavailable. Please try again." };
       }
 
+      if (!window.Appwrite || !window.Appwrite.Query) {
+        return { ok: false, reason: "Service unavailable. Please try again." };
+      }
       const { Query } = window.Appwrite;
       const normalizedCode = code.trim().toUpperCase();
 
@@ -1732,15 +1792,6 @@ const CheckoutPage = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-3 bg-green-50 rounded-lg border border-green-100">
-                  <MessageCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-green-900">Questions? We're here to help</p>
-                    <p className="text-xs text-green-700 mt-0.5">
-                      WhatsApp us at <a href="https://wa.me/+918850840154" target="_blank" rel="noopener noreferrer" className="font-semibold underline">+91 88508 40154</a> for instant support
-                    </p>
-                  </div>
-                </div>
               </div>
 
               <div className="border-t pt-8">
@@ -1750,30 +1801,26 @@ const CheckoutPage = () => {
                 </h3>
 
                 <div className="bg-gray-50 rounded-lg p-6">
-                  {!isFormValid ? (
-                    <div className="text-center py-8">
-                      <p className="text-gray-600 mb-4">
-                        Please complete all shipping information and add items
-                        to cart to proceed
-                      </p>
-                    </div>
-                  ) : (
-                    <div>
-                      <div
-                        ref={paypalRef}
-                        id="paypal-button-container"
-                        className="min-h-[150px]"
-                      />
-                      {!paypalLoaded && (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                          <p className="text-gray-600 mt-4">
-                            Loading PayPal...
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                  {!isFormValid && (
+                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4 text-center">
+                      Fill in your shipping details above, then pay below
+                    </p>
                   )}
+                  <div>
+                    <div
+                      ref={paypalRef}
+                      id="paypal-button-container"
+                      className="min-h-[150px]"
+                    />
+                    {!paypalLoaded && (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                        <p className="text-gray-600 mt-4">
+                          Loading PayPal...
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">

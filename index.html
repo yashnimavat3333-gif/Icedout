@@ -88,151 +88,208 @@
   <!-- CRITICAL: Global error handler for Meta in-app browsers (Instagram + Facebook) -->
   <!-- This MUST run before ANY other script to prevent layout shifts from JS errors -->
   <script>
-    // CRITICAL FIX: Prevent webkit.messageHandlers errors in Meta in-app browsers
-    // This error causes CLS spikes and conversion drops in Instagram/Facebook browsers
+    // CRITICAL FIX: Prevent runtime errors in Meta in-app browsers (Instagram + Facebook)
+    // Covers: _AutofillCallbackHandler, webkit.messageHandlers, Script error., Load failed,
+    //         .at() polyfill, Invalid regular expression (third-party), cross-origin noise
     (function() {
       'use strict';
       if (typeof window === 'undefined') return;
-      
-      // Detect ALL Meta in-app browsers (Instagram, Facebook, Messenger)
+
+      // ── 1. _AutofillCallbackHandler polyfill (iOS WebKit autofill bug) ──
+      // Safari/WebKit autofill calls this variable; if missing → "Can't find variable" error
+      try {
+        if (typeof window._AutofillCallbackHandler === 'undefined') {
+          window._AutofillCallbackHandler = function() { return; };
+        }
+        // Also cover the prefixed variant iOS sometimes uses
+        if (typeof window.__AutofillCallbackHandler === 'undefined') {
+          window.__AutofillCallbackHandler = function() { return; };
+        }
+      } catch (e) { /* silent */ }
+
+      // ── 2. Array.prototype.at polyfill (Safari <15.4, FB/IG in-app WebViews) ──
+      // Fixes: "o.entries.at is not a function" from DebugBear RUM and other libs
+      try {
+        if (!Array.prototype.at) {
+          Array.prototype.at = function(n) {
+            n = Math.trunc(n) || 0;
+            if (n < 0) n += this.length;
+            if (n < 0 || n >= this.length) return undefined;
+            return this[n];
+          };
+        }
+        // Also polyfill for NodeList, String, TypedArray (same pattern)
+        if (typeof NodeList !== 'undefined' && !NodeList.prototype.at) {
+          NodeList.prototype.at = Array.prototype.at;
+        }
+        if (!String.prototype.at) {
+          String.prototype.at = function(n) {
+            n = Math.trunc(n) || 0;
+            if (n < 0) n += this.length;
+            if (n < 0 || n >= this.length) return undefined;
+            return this[n];
+          };
+        }
+      } catch (e) { /* silent */ }
+
+      // ── 3. Detect Meta in-app browsers ──
       var ua = navigator.userAgent || navigator.vendor || '';
       var isMetaBrowser = /FBAN|FBAV|FB_IAB|FB4A|Instagram|Messenger/i.test(ua);
-      
-      // CRITICAL: Create safe webkit object IMMEDIATELY before any script can access it
-      // This prevents "undefined is not an object" errors that cause layout shifts
+
+      // ── 4. Safe webkit.messageHandlers stubs ──
       if (!window.webkit) {
         window.webkit = {};
       }
       if (!window.webkit.messageHandlers) {
         window.webkit.messageHandlers = {};
       }
-      
-      // Create safe handler stub that never throws
+
       var safeHandler = {
-        postMessage: function() {
-          // Silently do nothing - prevents errors in Meta browsers
-          return;
-        }
+        postMessage: function() { return; }
       };
-      
-      // Pre-populate common handler names that third-party scripts might access
-      // This prevents errors from occurring at all, not just catching them
-      var commonHandlers = ['bridge', 'native', 'app', 'webview', 'analytics', 'tracking', 'event'];
+
+      var commonHandlers = [
+        'bridge', 'native', 'app', 'webview', 'analytics', 'tracking', 'event',
+        'selectedDebugHandler', 'advertisingIdentifier', 'autoFill'
+      ];
       commonHandlers.forEach(function(name) {
         if (!window.webkit.messageHandlers[name]) {
           window.webkit.messageHandlers[name] = safeHandler;
         }
       });
-      
-      // CRITICAL: Global error handler - catches ANY webkit.messageHandlers error
-      // Must use capture phase to catch errors before they bubble
+
+      // ── 5. Global error handler — suppress ALL non-actionable errors ──
+      // Capture phase so we intercept before RUM/monitoring scripts re-throw
       window.addEventListener('error', function(e) {
-        var errorMessage = '';
+        var msg = '';
         if (e.message) {
-          errorMessage = String(e.message);
+          msg = String(e.message);
         } else if (e.error && e.error.message) {
-          errorMessage = String(e.error.message);
+          msg = String(e.error.message);
         }
-        
-        // Suppress webkit.messageHandlers errors completely
-        if (errorMessage.includes('webkit.messageHandlers') || 
-            errorMessage.includes('messageHandlers') ||
-            errorMessage.includes('webkit') && errorMessage.includes('undefined')) {
+
+        var suppress = false;
+
+        // a) Cross-origin "Script error." — no useful info, just noise from CDN scripts
+        if (msg === 'Script error.' || msg === 'Script error') {
+          suppress = true;
+        }
+
+        // b) "Load failed" — third-party script blocked by network/ad-blocker/in-app browser
+        if (msg === 'Load failed' || msg.indexOf('Load failed') === 0) {
+          suppress = true;
+        }
+
+        // c) webkit / messageHandlers errors
+        if (msg.indexOf('webkit') !== -1 && (msg.indexOf('messageHandlers') !== -1 || msg.indexOf('undefined') !== -1)) {
+          suppress = true;
+        }
+        if (msg.indexOf('messageHandlers') !== -1) {
+          suppress = true;
+        }
+
+        // d) _AutofillCallbackHandler not found (iOS autofill bug)
+        if (msg.indexOf('AutofillCallbackHandler') !== -1) {
+          suppress = true;
+        }
+
+        // e) .at() related (fallback if polyfill somehow missed)
+        if (msg.indexOf('.at is not a function') !== -1 || msg.indexOf('.at is undefined') !== -1) {
+          suppress = true;
+        }
+
+        // f) "Invalid regular expression" from third-party scripts
+        //    Only suppress when the error comes from a non-first-party script
+        if (msg.indexOf('Invalid regular expression') !== -1) {
+          var fileName = (e.filename || '').toLowerCase();
+          var isOurCode = fileName.indexOf('iceyout') !== -1 ||
+                          fileName.indexOf('localhost') !== -1 ||
+                          fileName.indexOf('/src/') !== -1;
+          if (!isOurCode) {
+            suppress = true;
+          }
+        }
+
+        if (suppress) {
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          // Never log in production - reduces noise and prevents layout shifts
           return false;
         }
-      }, true); // Use capture phase
-      
-      // CRITICAL: Catch promise rejections (async errors)
+      }, true);
+
+      // ── 6. Unhandled promise rejection handler ──
       window.addEventListener('unhandledrejection', function(e) {
-        var errorMessage = '';
+        var msg = '';
         if (e.reason) {
           if (typeof e.reason === 'string') {
-            errorMessage = e.reason;
+            msg = e.reason;
           } else if (typeof e.reason === 'object' && e.reason.message) {
-            errorMessage = String(e.reason.message);
+            msg = String(e.reason.message);
           }
         }
-        
-        if (errorMessage.includes('webkit.messageHandlers') || 
-            errorMessage.includes('messageHandlers') ||
-            errorMessage.includes('webkit') && errorMessage.includes('undefined')) {
+
+        if (msg.indexOf('webkit') !== -1 ||
+            msg.indexOf('messageHandlers') !== -1 ||
+            msg.indexOf('AutofillCallbackHandler') !== -1 ||
+            msg.indexOf('.at is not a function') !== -1 ||
+            msg === 'Script error.' ||
+            msg === 'Script error' ||
+            msg === 'Load failed') {
           e.preventDefault();
-          e.stopPropagation();
           return false;
         }
       });
-      
-      // CRITICAL: Protect against property access errors
-      // Override Object.defineProperty if needed to prevent webkit errors
+
+      // ── 7. Protect Object.defineProperty from webkit failures ──
       try {
-        var originalDefineProperty = Object.defineProperty;
-        Object.defineProperty = function(obj, prop, descriptor) {
+        var origDP = Object.defineProperty;
+        Object.defineProperty = function(obj, prop, desc) {
           try {
-            return originalDefineProperty.call(this, obj, prop, descriptor);
+            return origDP.call(this, obj, prop, desc);
           } catch (e) {
-            // If defining property on webkit fails, silently continue
-            if (String(e.message || '').includes('webkit')) {
+            if (String(e.message || '').indexOf('webkit') !== -1) {
               return obj;
             }
             throw e;
           }
         };
-      } catch (e) {
-        // Silently fail if override not possible
-      }
-      
-      // CRITICAL: Prevent Meta browser injected elements from causing CLS
-      // Meta browsers inject scripts/elements that can mutate DOM after first paint
+      } catch (e) { /* silent */ }
+
+      // ── 8. Prevent Meta-injected DOM mutations from causing CLS ──
       if (isMetaBrowser && typeof document !== 'undefined') {
-        // Use MutationObserver to catch and stabilize injected elements
         var observer = new MutationObserver(function(mutations) {
           mutations.forEach(function(mutation) {
             mutation.addedNodes.forEach(function(node) {
-              if (node.nodeType === 1) { // Element node
-                // Mark Meta-injected elements to prevent CLS
+              if (node.nodeType === 1) {
                 var isMetaInjected = node.getAttribute && (
                   node.getAttribute('data-meta-injected') ||
-                  node.src && (node.src.includes('facebook.com') || node.src.includes('instagram.com')) ||
-                  node.className && (String(node.className).includes('fb') || String(node.className).includes('ig'))
+                  (node.src && (node.src.indexOf('facebook.com') !== -1 || node.src.indexOf('instagram.com') !== -1)) ||
+                  (node.className && (String(node.className).indexOf('fb') !== -1 || String(node.className).indexOf('ig') !== -1))
                 );
-                
-                if (isMetaInjected || (node.tagName && ['IFRAME', 'SCRIPT'].includes(node.tagName))) {
-                  // Prevent injected elements from causing layout shifts
+
+                if (isMetaInjected || (node.tagName && (node.tagName === 'IFRAME' || node.tagName === 'SCRIPT'))) {
                   try {
                     if (node.style) {
                       node.style.contain = 'layout style paint';
                       node.style.willChange = 'auto';
                     }
-                    if (!node.getAttribute('data-meta-injected')) {
+                    if (node.getAttribute && !node.getAttribute('data-meta-injected')) {
                       node.setAttribute('data-meta-injected', 'true');
                     }
-                  } catch (e) {
-                    // Silently fail
-                  }
+                  } catch (e) { /* silent */ }
                 }
               }
             });
           });
         });
-        
-        // Observe document body for injected elements
+
         if (document.body) {
-          observer.observe(document.body, {
-            childList: true,
-            subtree: true
-          });
+          observer.observe(document.body, { childList: true, subtree: true });
         } else {
-          // Wait for body if not ready
           document.addEventListener('DOMContentLoaded', function() {
             if (document.body) {
-              observer.observe(document.body, {
-                childList: true,
-                subtree: true
-              });
+              observer.observe(document.body, { childList: true, subtree: true });
             }
           }, { once: true });
         }
