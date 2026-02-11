@@ -383,8 +383,43 @@ const CheckoutPage = () => {
     };
   }, [appliedCoupon, subtotalAmount]);
 
-  // Render PayPal buttons immediately when SDK loads (no form-valid gate)
-  // Validation is enforced inside createOrder so users see buttons right away
+  // ── Helper: extract shipping data from PayPal captured order ──
+  // PayPal returns payer + shipping info after approval; use it to fill gaps
+  const extractPayPalShipping = (order) => {
+    try {
+      const payer = order?.payer || {};
+      const shipping = order?.purchase_units?.[0]?.shipping || {};
+      const addr = shipping?.address || {};
+      const payerName = [payer?.name?.given_name, payer?.name?.surname]
+        .filter(Boolean)
+        .join(" ");
+      return {
+        email: payer?.email_address || "",
+        fullName: shipping?.name?.full_name || payerName || "",
+        phone: payer?.phone?.phone_number?.national_number || "",
+        address: addr?.address_line_1 || "",
+        city: addr?.admin_area_2 || "",
+        zipCode: addr?.postal_code || "",
+        country: addr?.country_code || "",
+      };
+    } catch (e) {
+      return {};
+    }
+  };
+
+  // ── Merge: prefer user-entered data, fall back to PayPal data ──
+  const mergeShipping = (formVals, paypalVals) => {
+    const merged = { ...formVals };
+    Object.keys(paypalVals).forEach((key) => {
+      if (!merged[key] || !String(merged[key]).trim()) {
+        merged[key] = paypalVals[key] || "";
+      }
+    });
+    return merged;
+  };
+
+  // Render PayPal buttons immediately when SDK loads — NO form-valid gate.
+  // Shipping validation is deferred to AFTER PayPal approval (onApprove).
   useEffect(() => {
     let mounted = true;
     if (!paypalLoaded || !paypalRef.current || !window.paypal) {
@@ -394,53 +429,15 @@ const CheckoutPage = () => {
     paypalRef.current.innerHTML = "";
 
     const buttons = window.paypal.Buttons({
+      // ── createOrder: no validation, just create the PayPal order ──
       createOrder: (data, actions) => {
-        // ── Validate shipping form BEFORE creating the PayPal order ──
-        const emailOk = !!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
-        const fieldsOk =
-          formData.fullName.trim() &&
-          formData.phone.trim() &&
-          formData.address.trim() &&
-          formData.city.trim() &&
-          formData.zipCode.trim() &&
-          formData.country.trim();
-        const hasItems = cartItems.length > 0;
-
-        if (!emailOk || !fieldsOk || !hasItems) {
-          // Build a user-friendly message
-          const missing = [];
-          if (!hasItems) missing.push("items in cart");
-          if (!formData.fullName.trim()) missing.push("full name");
-          if (!emailOk) missing.push("valid email");
-          if (!formData.phone.trim()) missing.push("phone number");
-          if (!formData.address.trim()) missing.push("address");
-          if (!formData.city.trim()) missing.push("city");
-          if (!formData.zipCode.trim()) missing.push("zip code");
-          if (!formData.country.trim()) missing.push("country");
-
+        // Only sanity-check: must have items and a positive amount
+        if (cartItems.length === 0 || finalAmount <= 0) {
           setOrderStatus({
             type: "error",
-            message: `Please complete: ${missing.join(", ")}`,
+            message: "Your cart is empty. Please add items before paying.",
           });
-
-          // Scroll to the first empty field for convenience
-          try {
-            const firstEmpty = document.querySelector(
-              'input:invalid, input[value=""], select[value=""]'
-            );
-            if (firstEmpty) {
-              firstEmpty.scrollIntoView({ behavior: "smooth", block: "center" });
-              firstEmpty.focus();
-            }
-          } catch (e) { /* silent */ }
-
-          // Reject to abort PayPal popup
-          return Promise.reject(new Error("Shipping info incomplete"));
-        }
-
-        // Clear any previous validation error
-        if (orderStatus?.type === "error" && orderStatus?.message?.startsWith("Please complete")) {
-          setOrderStatus(null);
+          return Promise.reject(new Error("Cart is empty"));
         }
 
         return actions.order.create({
@@ -452,10 +449,23 @@ const CheckoutPage = () => {
           ],
         });
       },
+
+      // ── onApprove: capture, extract PayPal shipping, merge, then save ──
       onApprove: async (data, actions) => {
         try {
           const order = await actions.order.capture();
-          await handlePaymentSuccess(order);
+
+          // Extract shipping details PayPal collected from the buyer
+          const paypalShipping = extractPayPalShipping(order);
+
+          // Merge: user-entered fields take priority, PayPal fills any blanks
+          const mergedData = mergeShipping(formData, paypalShipping);
+
+          // Persist merged data into React state (so the success page shows it)
+          setFormData(mergedData);
+
+          // Pass merged data directly to avoid stale closure
+          await handlePaymentSuccess(order, mergedData);
         } catch (err) {
           console.error("onApprove capture error:", err);
           setOrderStatus({
@@ -464,9 +474,10 @@ const CheckoutPage = () => {
           });
         }
       },
+
       onError: (err) => {
-        // Don't show error for intentional validation rejections
-        if (err && String(err.message || err).indexOf("Shipping info incomplete") !== -1) {
+        // Suppress cart-empty rejections (user already sees the message)
+        if (err && String(err.message || err).indexOf("Cart is empty") !== -1) {
           return;
         }
         console.error("PayPal error:", err);
@@ -479,8 +490,7 @@ const CheckoutPage = () => {
 
     buttons.render(paypalRef.current).catch((err) => {
       if (!mounted) return;
-      // Suppress expected validation-abort errors
-      if (err && String(err.message || err).indexOf("Shipping info incomplete") !== -1) {
+      if (err && String(err.message || err).indexOf("Cart is empty") !== -1) {
         return;
       }
       console.error("PayPal Buttons render failed:", err);
@@ -546,8 +556,11 @@ const CheckoutPage = () => {
     orderData,
     finalAmt,
     discountAmt,
-    coupon
+    coupon,
+    fd // merged form data (passed from onApprove to avoid stale closure)
   ) => {
+    // Use explicit param; fall back to component-level formData only as last resort
+    const form = fd || formData;
     try {
       // ensure SDK + clients are ready
       const ready = await ensureAppwriteReady({ timeoutMs: 10000 });
@@ -567,12 +580,12 @@ const CheckoutPage = () => {
       }
 
       const shippingData = {
-        fullName: formData.fullName,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        zipCode: formData.zipCode,
-        country: formData.country,
+        fullName: form.fullName,
+        phone: form.phone,
+        address: form.address,
+        city: form.city,
+        zipCode: form.zipCode,
+        country: form.country,
       };
 
       const verificationData = {
@@ -601,10 +614,10 @@ const CheckoutPage = () => {
         customerId: Math.floor(Math.random() * 1000000),
         orderDate: new Date().toISOString(),
         totalAmount: subtotalAmount,
-        shippingAddress: `${formData.address}, ${formData.city}, ${formData.zipCode}`,
-        billingAddress: `${formData.address}, ${formData.city}, ${formData.zipCode}`,
+        shippingAddress: `${form.address}, ${form.city}, ${form.zipCode}`,
+        billingAddress: `${form.address}, ${form.city}, ${form.zipCode}`,
         orderStatus: "completed",
-        userId: appwriteUserId || formData.email,
+        userId: appwriteUserId || form.email,
         amount: Math.floor(finalAmt || 0),
         currency: "USD",
         paypal_order_id: orderData?.id ?? null,
@@ -615,13 +628,13 @@ const CheckoutPage = () => {
         items_json: JSON.stringify(itemsData).substring(0, 999),
         verification_raw: JSON.stringify(verificationData).substring(0, 999),
         payment_method: "paypal",
-        shipping_full_name: formData.fullName,
-        shipping_phone: formData.phone,
-        shipping_line_1: formData.address,
-        shipping_city: formData.city,
-        shipping_postal_code: parseInt(formData.zipCode) || 0,
+        shipping_full_name: form.fullName,
+        shipping_phone: form.phone,
+        shipping_line_1: form.address,
+        shipping_city: form.city,
+        shipping_postal_code: parseInt(form.zipCode) || 0,
         order_id: orderData?.id ?? null,
-        shipping_country: formData.country,
+        shipping_country: form.country,
         shipping: JSON.stringify(shippingData).substring(0, 999),
         items: JSON.stringify(itemsData).substring(0, 999),
         shipping_json: JSON.stringify(shippingData).substring(0, 999),
@@ -934,14 +947,17 @@ const CheckoutPage = () => {
       .replace(/'/g, "&#039;");
   }
 
-  const handlePaymentSuccess = async (order) => {
+  const handlePaymentSuccess = async (order, mergedFormData) => {
     setLoading(true);
+    // Use merged data passed from onApprove (avoids stale closure)
+    const fd = mergedFormData || formData;
     try {
       const savedOrder = await saveOrderToAppwrite(
         order,
         finalAmount,
         discountAmount,
-        appliedCoupon
+        appliedCoupon,
+        fd
       );
 
       // Track Meta Pixel Purchase event after successful order save
@@ -985,14 +1001,14 @@ const CheckoutPage = () => {
           selectedSize: it.selectedSize,
           selectedVariation: it.selectedVariation,
         })),
-        email: formData.email,
-        customerName: formData.fullName,
+        email: fd.email,
+        customerName: fd.fullName,
         shipping: {
-          address: formData.address,
-          city: formData.city,
-          zipCode: formData.zipCode,
-          country: formData.country,
-          phone: formData.phone,
+          address: fd.address,
+          city: fd.city,
+          zipCode: fd.zipCode,
+          country: fd.country,
+          phone: fd.phone,
         },
         total: finalAmount,
         discount: discountAmount,
@@ -1801,11 +1817,6 @@ const CheckoutPage = () => {
                 </h3>
 
                 <div className="bg-gray-50 rounded-lg p-6">
-                  {!isFormValid && (
-                    <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4 text-center">
-                      Fill in your shipping details above, then pay below
-                    </p>
-                  )}
                   <div>
                     <div
                       ref={paypalRef}
