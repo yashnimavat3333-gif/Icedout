@@ -585,69 +585,25 @@ const CheckoutPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData, cartItems]);
 
-  // Helper: try to get current Appwrite user id (if signed in)
-  const getAppwriteUserId = async () => {
-    try {
-      let attempts = 0;
-      while (!appwriteClient && attempts < 50) {
-        await sleep(100);
-        attempts++;
-      }
-      if (!appwriteClient || !window.Appwrite) return null;
-      const Account = window.Appwrite.Account;
-      if (!Account) return null;
-      const account = new Account(appwriteClient);
-      const me = await account.get();
-      return me?.$id || null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  // ── saveOrderToAppwrite — with RETRY + detailed logging + null-safe payload ──
-  const saveOrderToAppwrite = async (
+  // ── saveOrderViaAPI — sends order to /api/create-order (server-side Appwrite) ──
+  // No client-side Appwrite SDK needed. The API route uses APPWRITE_API_KEY.
+  const saveOrderViaAPI = async (
     orderData,
     finalAmt,
     discountAmt,
     coupon,
     fd // merged form data (passed from onApprove to avoid stale closure)
   ) => {
-    // Use explicit param; fall back to ref, then component-level formData
     const form = fd || formDataRef.current || formData;
 
-    console.info("[CHECKOUT] saveOrderToAppwrite called", {
+    console.info("[CHECKOUT] saveOrderViaAPI called", {
       paypalOrderId: orderData?.id,
       finalAmt,
       email: form?.email,
       name: form?.fullName,
     });
 
-    // ── Step 1: Ensure Appwrite SDK is ready (with extended timeout) ──
-    let ready = false;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      ready = await ensureAppwriteReady({ timeoutMs: 12000 });
-      if (ready && appwriteDatabases) break;
-      console.warn(`[CHECKOUT] Appwrite SDK not ready (attempt ${attempt}/3), retrying in 2s…`);
-      await sleep(2000);
-    }
-    if (!ready || !appwriteDatabases) {
-      const err = new Error("Appwrite SDK failed to load after 3 attempts");
-      console.error("[CHECKOUT]", err.message);
-      throw err;
-    }
-
-    const { ID } = window.Appwrite;
-    console.info("[CHECKOUT] Appwrite SDK ready, building payload…");
-
-    // ── Step 2: Get user ID (best-effort) ──
-    let appwriteUserId = null;
-    try {
-      appwriteUserId = await getAppwriteUserId();
-    } catch (e) {
-      appwriteUserId = null;
-    }
-
-    // ── Step 3: Build sub-objects ──
+    // ── helpers ──
     const safeStr = (v) => (v == null ? "" : String(v));
     const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
 
@@ -668,7 +624,6 @@ const CheckoutPage = () => {
       timestamp: new Date().toISOString(),
     };
 
-    // Use latest cartItems from ref (avoids stale closure)
     const latestCartItems = cartItemsRef.current || cartItems;
     const itemsData = (Array.isArray(latestCartItems) ? latestCartItems : []).map(
       (item) => ({
@@ -682,8 +637,9 @@ const CheckoutPage = () => {
       })
     );
 
-    // ── Step 4: Build payload — all nulls replaced with "" or 0 ──
     const captureId = safeStr(orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id);
+
+    // ── Build the same payload the Appwrite document expects ──
     const payload = {
       orderId: Math.floor(Math.random() * 1000000),
       customerId: Math.floor(Math.random() * 1000000),
@@ -693,7 +649,7 @@ const CheckoutPage = () => {
       billingAddress: `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`,
       orderStatus: "completed",
       email: safeStr(form.email),
-      userId: appwriteUserId || safeStr(form.email),
+      userId: safeStr(form.email),
       amount: Math.floor(finalAmt || 0),
       currency: "USD",
       paypal_order_id: safeStr(orderData?.id),
@@ -716,16 +672,17 @@ const CheckoutPage = () => {
       amount_formatted: Math.floor((finalAmt || 0) * 100),
       paypal_capture_id: captureId,
       paypal_status: safeStr(orderData?.status),
-      // Coupon-related fields — use empty string instead of null for safety
       coupon_code: safeStr(coupon?.code),
       discount_percent:
         typeof coupon?.discountPercent === "number" ? coupon.discountPercent : 0,
       discount_amount: Number(discountAmt || 0),
       influencer: safeStr(coupon?.influencer),
+      // Private fields used by API route only (stripped before Appwrite insert)
+      _couponId: coupon?.$id || "",
+      _couponCode: safeStr(coupon?.code),
     };
 
     console.info("[CHECKOUT] Payload built:", {
-      orderId: payload.orderId,
       email: payload.email,
       amount: payload.amount,
       paypal_order_id: payload.paypal_order_id,
@@ -734,78 +691,52 @@ const CheckoutPage = () => {
       fieldCount: Object.keys(payload).length,
     });
 
-    // ── Step 5: Create document with RETRY (3 attempts) ──
-    let response = null;
+    // ── POST to /api/create-order with retry (3 attempts) ──
     let lastError = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        console.info(`[CHECKOUT] Appwrite createDocument attempt ${attempt}/3…`);
-        response = await appwriteDatabases.createDocument(
-          APPWRITE_DATABASE_ID,
-          APPWRITE_COLLECTION_ID,
-          ID.unique(),
-          payload
-        );
-        console.info("[CHECKOUT] ✅ Order saved to Appwrite:", response.$id);
-        lastError = null;
-        break; // success
-      } catch (err) {
-        lastError = err;
-        console.error(`[CHECKOUT] Appwrite createDocument attempt ${attempt} FAILED:`, {
-          message: err?.message,
-          code: err?.code,
-          type: err?.type,
+        console.info(`[CHECKOUT] /api/create-order attempt ${attempt}/3…`);
+        const res = await fetch("/api/create-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
 
-        // If it's a schema/validation error (400), don't retry — it will fail again
-        if (err?.code === 400 || err?.code === 401 || err?.code === 403) {
-          console.error("[CHECKOUT] Non-retryable error (code " + err?.code + "). Full error:", err);
-          break;
+        const json = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const errMsg = json?.error || `HTTP ${res.status}`;
+          console.error(`[CHECKOUT] API attempt ${attempt} FAILED:`, errMsg, json);
+          // 400-level errors won't self-fix — stop retrying
+          if (res.status >= 400 && res.status < 500) {
+            throw new Error(`Order API error (${res.status}): ${errMsg}`);
+          }
+          lastError = new Error(errMsg);
+          if (attempt < 3) {
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            console.info(`[CHECKOUT] Retrying in ${delay}ms…`);
+            await sleep(delay);
+          }
+          continue;
         }
 
-        // Wait before retry (exponential backoff: 1s, 2s, 4s)
+        console.info("[CHECKOUT] ✅ Order saved via API:", json.orderId);
+        // Return a shape compatible with what handlePaymentSuccess expects
+        return { $id: json.orderId, ...payload };
+      } catch (err) {
+        lastError = err;
+        console.error(`[CHECKOUT] /api/create-order attempt ${attempt} threw:`, err?.message);
         if (attempt < 3) {
           const delay = Math.pow(2, attempt - 1) * 1000;
-          console.info(`[CHECKOUT] Retrying in ${delay}ms…`);
           await sleep(delay);
         }
       }
     }
 
-    if (!response || lastError) {
-      const finalErr = lastError || new Error("createDocument returned null after 3 attempts");
-      console.error("[CHECKOUT] All Appwrite save attempts failed:", finalErr);
-      throw finalErr;
-    }
-
-    // ── Step 6: Increment coupon usage (best-effort, never fails the order) ──
-    if (coupon?.$id) {
-      try {
-        const couponDoc = await appwriteDatabases.getDocument(
-          APPWRITE_DATABASE_ID,
-          APPWRITE_COUPONS_COLLECTION_ID,
-          coupon.$id
-        );
-        const currentUsage = Number(couponDoc.usage_count || 0);
-        const newUsageCount = currentUsage + 1;
-        await appwriteDatabases.updateDocument(
-          APPWRITE_DATABASE_ID,
-          APPWRITE_COUPONS_COLLECTION_ID,
-          coupon.$id,
-          { usage_count: newUsageCount }
-        );
-        console.debug("[CHECKOUT] Coupon usage_count incremented:", {
-          couponId: coupon.$id,
-          code: coupon.code,
-          oldCount: currentUsage,
-          newCount: newUsageCount,
-        });
-      } catch (couponUpdateError) {
-        console.warn("[CHECKOUT] Failed to increment coupon usage (non-fatal):", couponUpdateError?.message);
-      }
-    }
-
-    return response;
+    // All attempts failed
+    const finalErr = lastError || new Error("Order API failed after 3 attempts");
+    console.error("[CHECKOUT] All API save attempts failed:", finalErr);
+    throw finalErr;
   };
 
   // Send order confirmation email via EmailJS (client-side)
@@ -1070,7 +1001,7 @@ const CheckoutPage = () => {
     });
 
     try {
-      const savedOrder = await saveOrderToAppwrite(
+      const savedOrder = await saveOrderViaAPI(
         order,
         useFinal,
         useDiscount,
@@ -1078,7 +1009,7 @@ const CheckoutPage = () => {
         fd
       );
 
-      console.info("[CHECKOUT] Order saved to Appwrite:", savedOrder?.$id);
+      console.info("[CHECKOUT] Order saved via API:", savedOrder?.$id);
 
       // Track Meta Pixel Purchase event after successful order save
       if (savedOrder && savedOrder.$id) {
