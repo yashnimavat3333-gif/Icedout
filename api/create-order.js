@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       items:          typeof body.items === "string"
                         ? body.items
                         : JSON.stringify(body.items || []),
-      Shippingphone:  safeStr(body.Shippingphone),
+      shippingphone:  safeStr(body.shipping_phone || body.shippingphone || body.Shippingphone),
       amount:         safeInt(body.amount),
 
       // ── Optional fields ──
@@ -106,7 +106,7 @@ export default async function handler(req, res) {
     console.log("[create-order] Incoming body:", {
       email: body.email,
       amount: body.amount,
-      Shippingphone: body.Shippingphone,
+      shippingphone: body.shipping_phone || body.shippingphone || body.Shippingphone,
       itemsLength: doc.items.length,
     });
 
