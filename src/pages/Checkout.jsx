@@ -605,24 +605,6 @@ const CheckoutPage = () => {
 
     // ── helpers ──
     const safeStr = (v) => (v == null ? "" : String(v));
-    const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
-
-    const shippingData = {
-      fullName: safeStr(form.fullName),
-      phone: safeStr(form.phone),
-      address: safeStr(form.address),
-      city: safeStr(form.city),
-      zipCode: safeStr(form.zipCode),
-      country: safeStr(form.country),
-    };
-
-    const verificationData = {
-      id: safeStr(orderData?.id),
-      status: safeStr(orderData?.status),
-      amount: safeStr(orderData?.purchase_units?.[0]?.amount?.value),
-      captureId: safeStr(orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id),
-      timestamp: new Date().toISOString(),
-    };
 
     const latestCartItems = cartItemsRef.current || cartItems;
     const itemsData = (Array.isArray(latestCartItems) ? latestCartItems : []).map(
@@ -637,56 +619,28 @@ const CheckoutPage = () => {
       })
     );
 
-    const captureId = safeStr(orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id);
-
-    // ── Build the same payload the Appwrite document expects ──
+    // ── Build payload matching Appwrite "order" schema (camelCase) ──
+    // The API route (/api/create-order) maps these to exact Appwrite fields.
+    const addrStr = `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`;
     const payload = {
-      orderId: Math.floor(Math.random() * 1000000),
-      customerId: Math.floor(Math.random() * 1000000),
-      orderDate: new Date().toISOString(),
-      totalAmount: subtotalAmount || 0,
-      shippingAddress: `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`,
-      billingAddress: `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`,
-      orderStatus: "completed",
-      email: safeStr(form.email),
-      userId: safeStr(form.email),
-      amount: Math.floor(finalAmt || 0),
-      currency: "USD",
-      paypal_order_id: safeStr(orderData?.id),
-      paypal_payment_id: captureId,
-      status: safeStr(orderData?.status),
-      amountPaise: Math.floor((finalAmt || 0) * 100),
-      items_json: JSON.stringify(itemsData).substring(0, 999),
-      verification_raw: JSON.stringify(verificationData).substring(0, 999),
-      payment_method: "paypal",
-      shipping_full_name: safeStr(form.fullName),
-      shipping_phone: safeStr(form.phone),
-      shipping_line_1: safeStr(form.address),
-      shipping_city: safeStr(form.city),
-      shipping_postal_code: safeInt(form.zipCode),
-      order_id: safeStr(orderData?.id),
-      shipping_country: safeStr(form.country),
-      shipping: JSON.stringify(shippingData).substring(0, 999),
-      items: JSON.stringify(itemsData).substring(0, 999),
-      shipping_json: JSON.stringify(shippingData).substring(0, 999),
-      amount_formatted: Math.floor((finalAmt || 0) * 100),
-      paypal_capture_id: captureId,
-      paypal_status: safeStr(orderData?.status),
-      coupon_code: safeStr(coupon?.code),
-      discount_percent:
-        typeof coupon?.discountPercent === "number" ? coupon.discountPercent : 0,
-      discount_amount: Number(discountAmt || 0),
-      influencer: safeStr(coupon?.influencer),
-      // Private fields used by API route only (stripped before Appwrite insert)
-      _couponId: coupon?.$id || "",
+      // Required fields
+      amount:         Math.floor(finalAmt || 0),
+      billingAddress: addrStr,
+      items:          JSON.stringify(itemsData),
+      Shippingphone:  safeStr(form.phone),
+      // Optional fields
+      totalAmount:     Math.floor(finalAmt || 0),
+      shippingAddress: addrStr,
+      email:           safeStr(form.email),
+      // Coupon metadata (stripped by API before Appwrite insert)
+      _couponId:   coupon?.$id || "",
       _couponCode: safeStr(coupon?.code),
     };
 
     console.info("[CHECKOUT] Payload built:", {
       email: payload.email,
       amount: payload.amount,
-      paypal_order_id: payload.paypal_order_id,
-      paypal_capture_id: payload.paypal_capture_id,
+      Shippingphone: payload.Shippingphone,
       itemCount: itemsData.length,
       fieldCount: Object.keys(payload).length,
     });
