@@ -83,7 +83,12 @@
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="https://cdn.debugbear.com">
   <link rel="dns-prefetch" href="https://connect.facebook.net">
-  
+
+  <!-- Preload Appwrite SDK so it's ready before checkout (critical for in-app browsers) -->
+  <link rel="preload" href="https://cdn.jsdelivr.net/npm/appwrite@14.0.1" as="script">
+  <!-- Also preconnect to Appwrite cloud API -->
+  <link rel="preconnect" href="https://cloud.appwrite.io">
+  <link rel="dns-prefetch" href="https://cloud.appwrite.io">
 
   <!-- CRITICAL: Global error handler for Meta in-app browsers (Instagram + Facebook) -->
   <!-- This MUST run before ANY other script to prevent layout shifts from JS errors -->

@@ -203,6 +203,17 @@ const CheckoutPage = () => {
   const [wiseError, setWiseError] = useState(null);
   const paypalRef = useRef(null);
 
+  // ── CRITICAL: Refs to break stale closures inside PayPal useEffect ──
+  // PayPal Buttons are rendered in a useEffect that does NOT depend on formData,
+  // appliedCoupon, discountAmount, etc.  When the onApprove callback fires, the
+  // closure captures whatever those values were at the time the effect ran (often
+  // the INITIAL empty state).  These refs always hold the LATEST values.
+  const formDataRef = useRef(formData);
+  const appliedCouponRef = useRef(null);
+  const discountAmountRef = useRef(0);
+  const finalAmountRef = useRef(0);
+  const cartItemsRef = useRef([]);
+
   const cartItems = Array.isArray(cart) ? cart : [];
   const subtotalAmount =
     typeof getTotal === "function"
@@ -217,6 +228,11 @@ const CheckoutPage = () => {
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
   const [couponLoading, setCouponLoading] = useState(false);
+
+  // ── Keep refs in sync with latest state (for PayPal closure) ──
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+  useEffect(() => { appliedCouponRef.current = appliedCoupon; }, [appliedCoupon]);
+  useEffect(() => { cartItemsRef.current = cartItems; });
 
   useEffect(() => {
     // eagerly pre-load Appwrite so it's ready by checkout time
@@ -383,6 +399,10 @@ const CheckoutPage = () => {
     };
   }, [appliedCoupon, subtotalAmount]);
 
+  // Keep financial refs in sync (used by PayPal closure)
+  useEffect(() => { discountAmountRef.current = discountAmount; }, [discountAmount]);
+  useEffect(() => { finalAmountRef.current = finalAmount; }, [finalAmount]);
+
   // ── Helper: extract shipping data from PayPal captured order ──
   // PayPal returns payer + shipping info after approval; use it to fill gaps
   const extractPayPalShipping = (order) => {
@@ -453,24 +473,57 @@ const CheckoutPage = () => {
       // ── onApprove: capture, extract PayPal shipping, merge, then save ──
       onApprove: async (data, actions) => {
         try {
+          console.info("[CHECKOUT] onApprove fired – capturing PayPal order…");
           const order = await actions.order.capture();
+          console.info("[CHECKOUT] PayPal capture SUCCESS:", order?.id, order?.status);
+
+          // ── Read LATEST state via refs (closure values are stale) ──
+          const latestFormData   = formDataRef.current;
+          const latestCoupon     = appliedCouponRef.current;
+          const latestDiscount   = discountAmountRef.current;
+          const latestFinal      = finalAmountRef.current;
+          const latestCartItems  = cartItemsRef.current;
+
+          console.info("[CHECKOUT] Latest formData (from ref):", latestFormData);
+          console.info("[CHECKOUT] Latest financials:", { latestFinal, latestDiscount, coupon: latestCoupon?.code });
 
           // Extract shipping details PayPal collected from the buyer
           const paypalShipping = extractPayPalShipping(order);
+          console.info("[CHECKOUT] PayPal shipping extracted:", paypalShipping);
 
           // Merge: user-entered fields take priority, PayPal fills any blanks
-          const mergedData = mergeShipping(formData, paypalShipping);
+          const mergedData = mergeShipping(latestFormData, paypalShipping);
+          console.info("[CHECKOUT] Merged shipping data:", mergedData);
 
           // Persist merged data into React state (so the success page shows it)
           setFormData(mergedData);
 
-          // Pass merged data directly to avoid stale closure
-          await handlePaymentSuccess(order, mergedData);
+          // Pass merged data + latest financials to avoid stale closure
+          await handlePaymentSuccess(order, mergedData, {
+            finalAmt: latestFinal,
+            discountAmt: latestDiscount,
+            coupon: latestCoupon,
+            items: latestCartItems,
+          });
         } catch (err) {
-          console.error("onApprove capture error:", err);
+          console.error("[CHECKOUT] onApprove CRITICAL error:", err);
+          // Attempt emergency localStorage save so order data is not lost
+          try {
+            const emergencyData = {
+              timestamp: new Date().toISOString(),
+              error: String(err?.message || err),
+              paypalData: data,
+              formData: formDataRef.current,
+            };
+            const existing = JSON.parse(localStorage.getItem("iceyout_failed_orders") || "[]");
+            existing.push(emergencyData);
+            localStorage.setItem("iceyout_failed_orders", JSON.stringify(existing));
+            console.warn("[CHECKOUT] Emergency save to localStorage:", emergencyData);
+          } catch (lsErr) { /* ignore */ }
+
           setOrderStatus({
             type: "error",
-            message: "Payment capture failed. Please contact support.",
+            message: "Payment was captured but order save failed. Your payment is safe — please contact support with PayPal order " + (data?.orderID || "N/A") + ".",
           });
         }
       },
@@ -551,7 +604,7 @@ const CheckoutPage = () => {
     }
   };
 
-  // ---------- REPLACE EXISTING saveOrderToAppwrite WITH THIS ----------
+  // ── saveOrderToAppwrite — with RETRY + detailed logging + null-safe payload ──
   const saveOrderToAppwrite = async (
     orderData,
     finalAmt,
@@ -559,151 +612,200 @@ const CheckoutPage = () => {
     coupon,
     fd // merged form data (passed from onApprove to avoid stale closure)
   ) => {
-    // Use explicit param; fall back to component-level formData only as last resort
-    const form = fd || formData;
+    // Use explicit param; fall back to ref, then component-level formData
+    const form = fd || formDataRef.current || formData;
+
+    console.info("[CHECKOUT] saveOrderToAppwrite called", {
+      paypalOrderId: orderData?.id,
+      finalAmt,
+      email: form?.email,
+      name: form?.fullName,
+    });
+
+    // ── Step 1: Ensure Appwrite SDK is ready (with extended timeout) ──
+    let ready = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      ready = await ensureAppwriteReady({ timeoutMs: 12000 });
+      if (ready && appwriteDatabases) break;
+      console.warn(`[CHECKOUT] Appwrite SDK not ready (attempt ${attempt}/3), retrying in 2s…`);
+      await sleep(2000);
+    }
+    if (!ready || !appwriteDatabases) {
+      const err = new Error("Appwrite SDK failed to load after 3 attempts");
+      console.error("[CHECKOUT]", err.message);
+      throw err;
+    }
+
+    const { ID } = window.Appwrite;
+    console.info("[CHECKOUT] Appwrite SDK ready, building payload…");
+
+    // ── Step 2: Get user ID (best-effort) ──
+    let appwriteUserId = null;
     try {
-      // ensure SDK + clients are ready
-      const ready = await ensureAppwriteReady({ timeoutMs: 10000 });
-      if (!ready || !appwriteDatabases) {
-        throw new Error("Appwrite not initialized (timed out)");
-      }
+      appwriteUserId = await getAppwriteUserId();
+    } catch (e) {
+      appwriteUserId = null;
+    }
 
-      // now safe to use window.Appwrite
-      const { ID } = window.Appwrite;
+    // ── Step 3: Build sub-objects ──
+    const safeStr = (v) => (v == null ? "" : String(v));
+    const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
 
-      // try get logged-in user id (best-effort)
-      let appwriteUserId = null;
+    const shippingData = {
+      fullName: safeStr(form.fullName),
+      phone: safeStr(form.phone),
+      address: safeStr(form.address),
+      city: safeStr(form.city),
+      zipCode: safeStr(form.zipCode),
+      country: safeStr(form.country),
+    };
+
+    const verificationData = {
+      id: safeStr(orderData?.id),
+      status: safeStr(orderData?.status),
+      amount: safeStr(orderData?.purchase_units?.[0]?.amount?.value),
+      captureId: safeStr(orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id),
+      timestamp: new Date().toISOString(),
+    };
+
+    // Use latest cartItems from ref (avoids stale closure)
+    const latestCartItems = cartItemsRef.current || cartItems;
+    const itemsData = (Array.isArray(latestCartItems) ? latestCartItems : []).map(
+      (item) => ({
+        id: safeStr(item.id ?? item.$id),
+        name: safeStr(item.name),
+        price: item.price,
+        quantity: item.quantity,
+        size: item.selectedSize,
+        variation: item.selectedVariation?.name,
+        sku: item.selectedVariation?.sku,
+      })
+    );
+
+    // ── Step 4: Build payload — all nulls replaced with "" or 0 ──
+    const captureId = safeStr(orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id);
+    const payload = {
+      orderId: Math.floor(Math.random() * 1000000),
+      customerId: Math.floor(Math.random() * 1000000),
+      orderDate: new Date().toISOString(),
+      totalAmount: subtotalAmount || 0,
+      shippingAddress: `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`,
+      billingAddress: `${safeStr(form.address)}, ${safeStr(form.city)}, ${safeStr(form.zipCode)}`,
+      orderStatus: "completed",
+      email: safeStr(form.email),
+      userId: appwriteUserId || safeStr(form.email),
+      amount: Math.floor(finalAmt || 0),
+      currency: "USD",
+      paypal_order_id: safeStr(orderData?.id),
+      paypal_payment_id: captureId,
+      status: safeStr(orderData?.status),
+      amountPaise: Math.floor((finalAmt || 0) * 100),
+      items_json: JSON.stringify(itemsData).substring(0, 999),
+      verification_raw: JSON.stringify(verificationData).substring(0, 999),
+      payment_method: "paypal",
+      shipping_full_name: safeStr(form.fullName),
+      shipping_phone: safeStr(form.phone),
+      shipping_line_1: safeStr(form.address),
+      shipping_city: safeStr(form.city),
+      shipping_postal_code: safeInt(form.zipCode),
+      order_id: safeStr(orderData?.id),
+      shipping_country: safeStr(form.country),
+      shipping: JSON.stringify(shippingData).substring(0, 999),
+      items: JSON.stringify(itemsData).substring(0, 999),
+      shipping_json: JSON.stringify(shippingData).substring(0, 999),
+      amount_formatted: Math.floor((finalAmt || 0) * 100),
+      paypal_capture_id: captureId,
+      paypal_status: safeStr(orderData?.status),
+      // Coupon-related fields — use empty string instead of null for safety
+      coupon_code: safeStr(coupon?.code),
+      discount_percent:
+        typeof coupon?.discountPercent === "number" ? coupon.discountPercent : 0,
+      discount_amount: Number(discountAmt || 0),
+      influencer: safeStr(coupon?.influencer),
+    };
+
+    console.info("[CHECKOUT] Payload built:", {
+      orderId: payload.orderId,
+      email: payload.email,
+      amount: payload.amount,
+      paypal_order_id: payload.paypal_order_id,
+      paypal_capture_id: payload.paypal_capture_id,
+      itemCount: itemsData.length,
+      fieldCount: Object.keys(payload).length,
+    });
+
+    // ── Step 5: Create document with RETRY (3 attempts) ──
+    let response = null;
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        appwriteUserId = await getAppwriteUserId();
-      } catch (e) {
-        appwriteUserId = null;
-      }
+        console.info(`[CHECKOUT] Appwrite createDocument attempt ${attempt}/3…`);
+        response = await appwriteDatabases.createDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COLLECTION_ID,
+          ID.unique(),
+          payload
+        );
+        console.info("[CHECKOUT] ✅ Order saved to Appwrite:", response.$id);
+        lastError = null;
+        break; // success
+      } catch (err) {
+        lastError = err;
+        console.error(`[CHECKOUT] Appwrite createDocument attempt ${attempt} FAILED:`, {
+          message: err?.message,
+          code: err?.code,
+          type: err?.type,
+        });
 
-      const shippingData = {
-        fullName: form.fullName,
-        phone: form.phone,
-        address: form.address,
-        city: form.city,
-        zipCode: form.zipCode,
-        country: form.country,
-      };
+        // If it's a schema/validation error (400), don't retry — it will fail again
+        if (err?.code === 400 || err?.code === 401 || err?.code === 403) {
+          console.error("[CHECKOUT] Non-retryable error (code " + err?.code + "). Full error:", err);
+          break;
+        }
 
-      const verificationData = {
-        id: orderData?.id ?? null,
-        status: orderData?.status ?? null,
-        amount: orderData?.purchase_units?.[0]?.amount?.value ?? null,
-        captureId:
-          orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id ?? null,
-        timestamp: new Date().toISOString(),
-      };
-
-      const itemsData = (Array.isArray(cartItems) ? cartItems : []).map(
-        (item) => ({
-          id: item.id ?? item.$id,
-          name: item.name,
-          price: item.price,
-          quantity: item.quantity,
-          size: item.selectedSize,
-          variation: item.selectedVariation?.name,
-          sku: item.selectedVariation?.sku,
-        })
-      );
-
-      const payload = {
-        orderId: Math.floor(Math.random() * 1000000),
-        customerId: Math.floor(Math.random() * 1000000),
-        orderDate: new Date().toISOString(),
-        totalAmount: subtotalAmount,
-        shippingAddress: `${form.address}, ${form.city}, ${form.zipCode}`,
-        billingAddress: `${form.address}, ${form.city}, ${form.zipCode}`,
-        orderStatus: "completed",
-        userId: appwriteUserId || form.email,
-        amount: Math.floor(finalAmt || 0),
-        currency: "USD",
-        paypal_order_id: orderData?.id ?? null,
-        paypal_payment_id:
-          orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id ?? null,
-        status: orderData?.status ?? null,
-        amountPaise: Math.floor((finalAmt || 0) * 100),
-        items_json: JSON.stringify(itemsData).substring(0, 999),
-        verification_raw: JSON.stringify(verificationData).substring(0, 999),
-        payment_method: "paypal",
-        shipping_full_name: form.fullName,
-        shipping_phone: form.phone,
-        shipping_line_1: form.address,
-        shipping_city: form.city,
-        shipping_postal_code: parseInt(form.zipCode) || 0,
-        order_id: orderData?.id ?? null,
-        shipping_country: form.country,
-        shipping: JSON.stringify(shippingData).substring(0, 999),
-        items: JSON.stringify(itemsData).substring(0, 999),
-        shipping_json: JSON.stringify(shippingData).substring(0, 999),
-        amount_formatted: Math.floor((finalAmt || 0) * 100),
-        paypal_capture_id:
-          orderData?.purchase_units?.[0]?.payments?.captures?.[0]?.id ?? null,
-        paypal_status: orderData?.status ?? null,
-        // Coupon-related fields (nullable)
-        coupon_code: coupon?.code ?? null,
-        discount_percent:
-          typeof coupon?.discountPercent === "number"
-            ? coupon.discountPercent
-            : null,
-        discount_amount: Number(discountAmt || 0),
-        influencer: coupon?.influencer ?? null,
-      };
-
-      const response = await appwriteDatabases.createDocument(
-        APPWRITE_DATABASE_ID,
-        APPWRITE_COLLECTION_ID,
-        ID.unique(),
-        payload
-      );
-
-      // Increment coupon usage_count atomically if coupon was applied
-      if (coupon?.$id) {
-        try {
-          // Get current coupon document
-          const couponDoc = await appwriteDatabases.getDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_COUPONS_COLLECTION_ID,
-            coupon.$id
-          );
-
-          // Increment usage_count (read current, then update)
-          const currentUsage = Number(couponDoc.usage_count || 0);
-          const newUsageCount = currentUsage + 1;
-
-          await appwriteDatabases.updateDocument(
-            APPWRITE_DATABASE_ID,
-            APPWRITE_COUPONS_COLLECTION_ID,
-            coupon.$id,
-            {
-              usage_count: newUsageCount,
-            }
-          );
-
-          console.debug("Coupon usage_count incremented:", {
-            couponId: coupon.$id,
-            code: coupon.code,
-            oldCount: currentUsage,
-            newCount: newUsageCount,
-          });
-        } catch (couponUpdateError) {
-          // Log but don't fail the order if coupon update fails
-          console.warn("Failed to increment coupon usage_count:", couponUpdateError);
-          console.warn("Coupon update error details:", {
-            couponId: coupon?.$id,
-            error: couponUpdateError?.message,
-            code: couponUpdateError?.code,
-          });
+        // Wait before retry (exponential backoff: 1s, 2s, 4s)
+        if (attempt < 3) {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          console.info(`[CHECKOUT] Retrying in ${delay}ms…`);
+          await sleep(delay);
         }
       }
-
-      return response;
-    } catch (error) {
-      console.error("Appwrite error:", error);
-      throw error;
     }
+
+    if (!response || lastError) {
+      const finalErr = lastError || new Error("createDocument returned null after 3 attempts");
+      console.error("[CHECKOUT] All Appwrite save attempts failed:", finalErr);
+      throw finalErr;
+    }
+
+    // ── Step 6: Increment coupon usage (best-effort, never fails the order) ──
+    if (coupon?.$id) {
+      try {
+        const couponDoc = await appwriteDatabases.getDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COUPONS_COLLECTION_ID,
+          coupon.$id
+        );
+        const currentUsage = Number(couponDoc.usage_count || 0);
+        const newUsageCount = currentUsage + 1;
+        await appwriteDatabases.updateDocument(
+          APPWRITE_DATABASE_ID,
+          APPWRITE_COUPONS_COLLECTION_ID,
+          coupon.$id,
+          { usage_count: newUsageCount }
+        );
+        console.debug("[CHECKOUT] Coupon usage_count incremented:", {
+          couponId: coupon.$id,
+          code: coupon.code,
+          oldCount: currentUsage,
+          newCount: newUsageCount,
+        });
+      } catch (couponUpdateError) {
+        console.warn("[CHECKOUT] Failed to increment coupon usage (non-fatal):", couponUpdateError?.message);
+      }
+    }
+
+    return response;
   };
 
   // Send order confirmation email via EmailJS (client-side)
@@ -947,31 +1049,47 @@ const CheckoutPage = () => {
       .replace(/'/g, "&#039;");
   }
 
-  const handlePaymentSuccess = async (order, mergedFormData) => {
+  const handlePaymentSuccess = async (order, mergedFormData, latestFinancials) => {
     setLoading(true);
     // Use merged data passed from onApprove (avoids stale closure)
-    const fd = mergedFormData || formData;
+    const fd = mergedFormData || formDataRef.current || formData;
+    // Use latest financials passed from onApprove (avoids stale closure)
+    const useFinal    = latestFinancials?.finalAmt    ?? finalAmountRef.current   ?? finalAmount;
+    const useDiscount = latestFinancials?.discountAmt ?? discountAmountRef.current ?? discountAmount;
+    const useCoupon   = latestFinancials?.coupon      ?? appliedCouponRef.current  ?? appliedCoupon;
+    const useItems    = latestFinancials?.items        ?? cartItemsRef.current      ?? cartItems;
+
+    console.info("[CHECKOUT] handlePaymentSuccess called", {
+      paypalOrderId: order?.id,
+      formEmail: fd?.email,
+      formName: fd?.fullName,
+      finalAmount: useFinal,
+      discount: useDiscount,
+      coupon: useCoupon?.code,
+      itemCount: useItems?.length,
+    });
+
     try {
       const savedOrder = await saveOrderToAppwrite(
         order,
-        finalAmount,
-        discountAmount,
-        appliedCoupon,
+        useFinal,
+        useDiscount,
+        useCoupon,
         fd
       );
 
+      console.info("[CHECKOUT] Order saved to Appwrite:", savedOrder?.$id);
+
       // Track Meta Pixel Purchase event after successful order save
-      // Only fire if order was successfully saved to database
       if (savedOrder && savedOrder.$id) {
         try {
           if (typeof window.trackMetaPixelPurchase === 'function') {
-            // Build product data arrays for Purchase event
-            const productIds = cartItems.map(item => item.$id || item.id || '').filter(Boolean);
-            const productNames = cartItems.map(item => item.name || '').filter(Boolean);
-            const productQuantities = cartItems.map(item => item.quantity || 1);
+            const productIds = useItems.map(item => item.$id || item.id || '').filter(Boolean);
+            const productNames = useItems.map(item => item.name || '').filter(Boolean);
+            const productQuantities = useItems.map(item => item.quantity || 1);
             
             window.trackMetaPixelPurchase(
-              finalAmount || 0,
+              useFinal || 0,
               'USD',
               productIds,
               productNames,
@@ -979,7 +1097,6 @@ const CheckoutPage = () => {
             );
           }
         } catch (e) {
-          // Silently fail - do not break order flow
           console.warn('Meta Pixel Purchase tracking failed:', e);
         }
       }
@@ -987,12 +1104,12 @@ const CheckoutPage = () => {
       setCompletedOrder({
         ...savedOrder,
         paypalOrderId: order.id,
-        items: cartItems,
+        items: useItems,
       });
 
-      // Build explicit payload for email send (avoid relying on Appwrite doc shape)
+      // Build explicit payload for email send
       const emailOrderPayload = {
-        items: cartItems.map((it) => ({
+        items: useItems.map((it) => ({
           id: it.id ?? it.$id,
           name: it.name || it.title,
           price: it.price,
@@ -1010,27 +1127,28 @@ const CheckoutPage = () => {
           country: fd.country,
           phone: fd.phone,
         },
-        total: finalAmount,
-        discount: discountAmount,
+        total: useFinal,
+        discount: useDiscount,
         order_id: savedOrder?.$id ?? order.id,
-        finalAmount,
+        finalAmount: useFinal,
       };
-      // console.log(emailOrderPayload);
-      // Attempt to send confirmation email (best-effort)
+
+      // Attempt to send confirmation email (best-effort, never blocks success)
       try {
+        console.info("[CHECKOUT] Sending confirmation email…");
         const emailRes = await sendOrderConfirmationEmail(
           emailOrderPayload,
           order
         );
-        // console.log(emailRes);
         if (!emailRes.ok) {
-          console.warn("Order saved but email failed:", emailRes.reason);
+          console.warn("[CHECKOUT] Order saved but email failed:", emailRes.reason);
           setOrderStatus((prev) => ({ ...(prev || {}), emailSent: false }));
         } else {
+          console.info("[CHECKOUT] Confirmation email sent OK");
           setOrderStatus((prev) => ({ ...(prev || {}), emailSent: true }));
         }
       } catch (e) {
-        console.warn("Email send threw:", e);
+        console.warn("[CHECKOUT] Email send threw:", e);
         setOrderStatus((prev) => ({ ...(prev || {}), emailSent: false }));
       }
 
@@ -1047,10 +1165,44 @@ const CheckoutPage = () => {
         orderId: order.id,
       });
     } catch (error) {
+      // ──────────────────────────────────────────────────────────────────
+      // CRITICAL: Log the FULL error so we know WHY the order save failed
+      // ──────────────────────────────────────────────────────────────────
+      console.error("[CHECKOUT] handlePaymentSuccess FAILED:", error);
+      console.error("[CHECKOUT] Error details:", {
+        message: error?.message,
+        code: error?.code,
+        type: error?.type,
+        response: error?.response,
+      });
+
+      // Emergency save to localStorage so the order is not permanently lost
+      try {
+        const recovery = {
+          timestamp: new Date().toISOString(),
+          paypalOrderId: order?.id,
+          paypalStatus: order?.status,
+          captureId: order?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+          formData: fd,
+          finalAmount: useFinal,
+          discount: useDiscount,
+          coupon: useCoupon?.code,
+          items: useItems.map(it => ({ name: it.name, price: it.price, qty: it.quantity })),
+          error: String(error?.message || error),
+          errorCode: error?.code,
+        };
+        const existing = JSON.parse(localStorage.getItem("iceyout_failed_orders") || "[]");
+        existing.push(recovery);
+        localStorage.setItem("iceyout_failed_orders", JSON.stringify(existing));
+        console.warn("[CHECKOUT] Emergency order data saved to localStorage:", recovery);
+      } catch (lsErr) { /* ignore */ }
+
       setOrderStatus({
         type: "error",
         message:
-          "Payment processed but failed to save order. Please contact support.",
+          "Payment was captured successfully but we couldn't save the order. " +
+          "Your payment is safe. Please contact support with PayPal Order ID: " +
+          (order?.id || "N/A") + ". Error: " + (error?.message || "Unknown"),
       });
     } finally {
       setLoading(false);
