@@ -85,14 +85,31 @@ export default async function handler(req, res) {
     const safeStr = (v) => (v == null ? "" : String(v));
     const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
 
+    // Normalize items: ensure each item retains id, name, price, quantity, size
+    let parsedItems = [];
+    try {
+      parsedItems = typeof body.items === "string"
+        ? JSON.parse(body.items)
+        : Array.isArray(body.items) ? body.items : [];
+    } catch {
+      parsedItems = [];
+    }
+    const normalizedItems = parsedItems.map((it) => ({
+      id:       safeStr(it.id ?? it.$id),
+      name:     safeStr(it.name),
+      price:    it.price ?? 0,
+      quantity: it.quantity ?? 1,
+      size:     safeStr(it.size || it.selectedSize),
+      variation: safeStr(it.variation),
+      sku:      safeStr(it.sku),
+    }));
+
     const doc = {
       // ── Required fields ──
       orderId:        Date.now(),
       orderDate:      new Date().toISOString(),
       billingAddress: safeStr(body.billingAddress),
-      items:          typeof body.items === "string"
-                        ? body.items
-                        : JSON.stringify(body.items || []),
+      items:          JSON.stringify(normalizedItems),
       shippingphone:  safeStr(body.shipping_phone || body.shippingphone || body.Shippingphone),
       amount:         safeInt(body.amount),
 

@@ -35,6 +35,17 @@ function formatAmount(val) {
   return `$${n.toFixed(2)}`;
 }
 
+function parseItems(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function AdminOrders() {
   const [adminKey, setAdminKey] = useState(() => sessionStorage.getItem("admin_key") || "");
   const [authenticated, setAuthenticated] = useState(false);
@@ -263,6 +274,7 @@ export default function AdminOrders() {
                     <th className="sticky top-0 bg-gray-800/95 backdrop-blur-sm px-4 py-3 text-left font-medium">Phone</th>
                     <th className="sticky top-0 bg-gray-800/95 backdrop-blur-sm px-4 py-3 text-left font-medium">City</th>
                     <th className="sticky top-0 bg-gray-800/95 backdrop-blur-sm px-4 py-3 text-left font-medium">Country</th>
+                    <th className="sticky top-0 bg-gray-800/95 backdrop-blur-sm px-4 py-3 text-left font-medium min-w-[220px]">Items</th>
                     <th className="sticky top-0 bg-gray-800/95 backdrop-blur-sm px-4 py-3 text-left font-medium">Created</th>
                   </tr>
                 </thead>
@@ -322,6 +334,24 @@ export default function AdminOrders() {
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {order.shipping_country || "—"}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-300">
+                        {(() => {
+                          const items = parseItems(order.items);
+                          if (!items.length) return <span className="text-gray-600">—</span>;
+                          return (
+                            <div className="space-y-1.5 min-w-[200px]">
+                              {items.map((item, idx) => (
+                                <div key={idx} className="bg-gray-800/50 rounded px-2 py-1.5 leading-relaxed">
+                                  <div className="font-medium text-gray-200 truncate max-w-[200px]">{item.name || "Unnamed"}</div>
+                                  <div className="text-gray-500 mt-0.5">
+                                    Size: {item.size || "N/A"} · Qty: {item.quantity ?? 1} · ${Number(item.price ?? 0).toFixed(2)}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(order.$createdAt || order.orderDate)}
