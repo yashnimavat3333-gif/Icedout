@@ -1,34 +1,24 @@
-// src/pages/CategoryPage.jsx
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { Client, Databases, Query } from "appwrite";
 import ProductCard from "../components/products/ProductCard";
 import conf from "../conf/conf";
 import SpinnerLoader from "../components/SpinnerLoader";
 
-const INITIAL_BATCH_SIZE = 16; // Initial products to load
-const BATCH_SIZE = 16; // Products per batch for infinite scroll
-const MAX_BATCH_SIZE = 100; // Appwrite max per request
+const PRODUCTS_PER_PAGE = 10;
+const ABOVE_FOLD_COUNT = 8;
 
 const CategoryPage = ({ category: propCategory }) => {
   const { categoryName: urlCategoryName } = useParams();
   const location = useLocation();
 
   const [category, setCategory] = useState(propCategory || null);
-  const [products, setProducts] = useState([]); // Only visible products
-  const [allProductsCount, setAllProductsCount] = useState(0); // Total count for display
+  const [products, setProducts] = useState([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [cursor, setCursor] = useState(null);
-  const [baseQueries, setBaseQueries] = useState([]);
-  
-  // Refs for infinite scroll
-  const observerTarget = useRef(null);
-  const isInitialLoad = useRef(true);
 
-  // Init Appwrite client once
   const databases = useMemo(() => {
     const client = new Client()
       .setEndpoint(conf.appwriteUrl)
@@ -36,115 +26,37 @@ const CategoryPage = ({ category: propCategory }) => {
     return new Databases(client);
   }, []);
 
-  // Category from props, router state, or URL
   const categoryName =
     propCategory?.name || location.state?.categoryName || urlCategoryName;
 
-  useEffect(() => {
-    // Defer scroll-to-top until after styles are loaded to avoid early layout thrash
-    const scrollToTop = () => {
-      window.scrollTo({ top: 0, behavior: "auto" });
-    };
+  const totalPages = Math.ceil(totalCount / PRODUCTS_PER_PAGE);
 
-    if (document.readyState === "complete") {
-      // Run on the next frame so React can paint first
-      requestAnimationFrame(scrollToTop);
-    } else {
-      window.addEventListener("load", () => {
-        requestAnimationFrame(scrollToTop);
-      }, { once: true });
-    }
-  }, [categoryName]);
+  const fetchProducts = useCallback(
+    async (page) => {
+      setLoading(true);
+      setError(null);
 
-  // Fetch a single batch of products
-  const fetchBatch = useCallback(async (baseQueries, cursor = null, limit = BATCH_SIZE) => {
-    const queries = [
-      Query.limit(limit),
-      ...(cursor ? [Query.cursorAfter(cursor)] : []),
-      ...baseQueries,
-    ];
-
-    const res = await databases.listDocuments(
-      conf.appwriteDatabaseId,
-      conf.appwriteProductCollectionId,
-      queries
-    );
-
-    const docs = Array.isArray(res?.documents) ? res.documents : [];
-    const newCursor = docs.length > 0 ? docs[docs.length - 1].$id : null;
-    const hasMoreData = docs.length === limit;
-
-    return { docs, cursor: newCursor, hasMore: hasMoreData };
-  }, [databases]);
-
-  // Get total count (for display only, doesn't fetch all products)
-  const fetchTotalCount = useCallback(async (baseQueries) => {
-    try {
-      const res = await databases.listDocuments(
-        conf.appwriteDatabaseId,
-        conf.appwriteProductCollectionId,
-        [Query.limit(1), ...baseQueries]
-      );
-      // Appwrite doesn't provide total count directly, so we estimate
-      // by checking if there are more than initial batch
-      return res.total || null;
-    } catch {
-      return null;
-    }
-  }, [databases]);
-
-  // Build base queries based on category
-  useEffect(() => {
-    const buildBaseQueries = async () => {
-      if (categoryName) {
-        try {
-          // Try exact match first
-          setBaseQueries([Query.equal("categories", categoryName)]);
-        } catch {
-          // Fallback handled in fetchBatch
-          setBaseQueries([]);
-        }
-      } else {
-        setBaseQueries([]);
-      }
-    };
-    buildBaseQueries();
-  }, [categoryName]);
-
-  // Initial load: fetch first batch only
-  useEffect(() => {
-    const run = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        setProducts([]);
-        setCursor(null);
-        setHasMore(true);
-        isInitialLoad.current = true;
+        const offset = (page - 1) * PRODUCTS_PER_PAGE;
+        const baseQueries = categoryName
+          ? [Query.equal("categories", categoryName)]
+          : [];
 
-        let queries = [];
-        if (categoryName) {
-          try {
-            queries = [Query.equal("categories", categoryName)];
-          } catch {
-            // Will handle in fetchBatch
-            queries = [];
-          }
-        }
+        const queries = [
+          Query.limit(PRODUCTS_PER_PAGE),
+          Query.offset(offset),
+          ...baseQueries,
+        ];
 
-        // Fetch initial batch only - never load more than INITIAL_BATCH_SIZE
-        const { docs, cursor: newCursor, hasMore: hasMoreData } = await fetchBatch(
-          queries,
-          null,
-          INITIAL_BATCH_SIZE
+        const res = await databases.listDocuments(
+          conf.appwriteDatabaseId,
+          conf.appwriteProductCollectionId,
+          queries
         );
 
-        // Set products - if no results, show empty state (don't load all products)
-          setProducts(docs);
-          setCursor(newCursor);
-          setHasMore(hasMoreData);
-        // Only show count of loaded products, not total (avoids loading all)
-          setAllProductsCount(docs.length);
+        const docs = Array.isArray(res?.documents) ? res.documents : [];
+        setProducts(docs);
+        setTotalCount(res.total ?? 0);
 
         if (!category && docs.length > 0) {
           setCategory({ name: categoryName });
@@ -154,91 +66,57 @@ const CategoryPage = ({ category: propCategory }) => {
         setError(`Failed to load category data: ${e.message}`);
       } finally {
         setLoading(false);
-        isInitialLoad.current = false;
       }
-    };
+    },
+    [databases, categoryName, category]
+  );
 
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryName, fetchBatch]); // re-run when category changes
-
-  // Load more products (infinite scroll)
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || !cursor) return;
-
-    setLoadingMore(true);
-    try {
-      const { docs, cursor: newCursor, hasMore: hasMoreData } = await fetchBatch(
-        baseQueries,
-        cursor,
-        BATCH_SIZE
-      );
-
-      setProducts((prev) => [...prev, ...docs]);
-      setCursor(newCursor);
-      setHasMore(hasMoreData);
-      setAllProductsCount((prev) => prev + docs.length);
-    } catch (e) {
-      console.error("Failed to load more products:", e);
-    } finally {
-      setLoadingMore(false);
-    }
-  }, [loadingMore, hasMore, cursor, baseQueries, fetchBatch]);
-
-  // Intersection Observer for infinite scroll - optimized for performance
+  // Reset to page 1 when category changes
   useEffect(() => {
-    // Don't set up observer during initial load or if no more products
-    if (isInitialLoad.current || loading || !hasMore || !cursor) return;
+    setCurrentPage(1);
+  }, [categoryName]);
 
-    let observer;
-    const currentTarget = observerTarget.current;
+  // Fetch products whenever page or category changes
+  useEffect(() => {
+    fetchProducts(currentPage);
+  }, [currentPage, fetchProducts]);
 
-    // Use requestIdleCallback to defer observer setup (non-blocking)
-    const setupObserver = () => {
-      if (!currentTarget || loadingMore) return;
+  const goToPage = (page) => {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-      observer = new IntersectionObserver(
-      (entries) => {
-          // Only trigger if element is intersecting and we're not already loading
-          if (entries[0]?.isIntersecting && hasMore && !loadingMore && cursor) {
-          loadMore();
-        }
-      },
-        { 
-          threshold: 0.1, 
-          rootMargin: "300px" // Start loading 300px before reaching bottom for smoother UX
-        }
-    );
-
-      observer.observe(currentTarget);
-    };
-
-    // Defer observer setup to prevent blocking
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(setupObserver, { timeout: 1000 });
-    } else {
-      // Fallback for browsers without requestIdleCallback
-      setTimeout(setupObserver, 100);
+  // Generate visible page numbers with ellipsis
+  const getPageNumbers = () => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
     }
 
-    return () => {
-      if (observer && currentTarget) {
-        observer.unobserve(currentTarget);
-      }
-    };
-  }, [hasMore, loading, loadingMore, loadMore, cursor]);
+    const pages = [];
+    pages.push(1);
 
-  // ProductCard is already memoized at export, no need to memoize again
+    if (currentPage > 3) pages.push("…");
+
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) pages.push(i);
+
+    if (currentPage < totalPages - 2) pages.push("…");
+
+    pages.push(totalPages);
+    return pages;
+  };
 
   if (error) {
     return (
       <div className="text-center py-12">
         <p className="text-red-500">{error}</p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          onClick={() => fetchProducts(currentPage)}
+          className="mt-4 px-4 py-2 bg-gray-900 text-white rounded hover:bg-gray-800 transition-colors"
         >
-          Refresh Page
+          Try Again
         </button>
       </div>
     );
@@ -259,22 +137,24 @@ const CategoryPage = ({ category: propCategory }) => {
           {(category?.name || categoryName || "All Products").toUpperCase()}
         </h1>
         <p className="text-gray-600 mt-2">
-          {allProductsCount > 0 ? (
+          {totalCount > 0 ? (
             <>
-              Showing {products.length}
-              {hasMore && ` of ${allProductsCount}+`} {products.length === 1 ? "product" : "products"}
+              {totalCount} {totalCount === 1 ? "product" : "products"}
+              {totalPages > 1 && (
+                <span className="text-gray-400">
+                  {" "}· Page {currentPage} of {totalPages}
+                </span>
+              )}
             </>
           ) : (
             "0 products available"
           )}
         </p>
-        {/* Lightweight engagement guidance */}
         {products.length > 0 && (
           <p className="text-sm text-gray-600 mt-1">
             Tap any product to view full details
           </p>
         )}
-        {/* Trust signal */}
         {products.length > 0 && (
           <p className="text-xs text-gray-400 mt-2">
             ✓ Worldwide insured shipping • Quality checked before dispatch
@@ -285,13 +165,10 @@ const CategoryPage = ({ category: propCategory }) => {
       {products.length > 0 ? (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {products.map((product, index) => {
-              // First 8 products are above fold - eager load for LCP
-              const isAboveFold = index < 8;
-              return (
-                <ProductCard
+            {products.map((product, index) => (
+              <ProductCard
                 key={product.$id}
-                  isAboveFold={isAboveFold}
+                isAboveFold={index < ABOVE_FOLD_COUNT}
                 product={{
                   id: product.$id,
                   $id: product.$id,
@@ -306,42 +183,53 @@ const CategoryPage = ({ category: propCategory }) => {
                   listPrice: product.listPrice,
                 }}
               />
-              );
-            })}
+            ))}
           </div>
 
-          {/* Infinite scroll trigger */}
-          {hasMore && (
-            <div
-              ref={observerTarget}
-              className="flex justify-center items-center py-8"
-            >
-              {loadingMore && (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-gray-900"></div>
-                  <span className="text-gray-600">Loading more products...</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Manual load more button (fallback for older browsers) */}
-          {hasMore && !loadingMore && (
-            <div className="flex justify-center py-4">
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <nav className="flex items-center justify-center gap-1.5 mt-12 mb-4">
               <button
-                onClick={loadMore}
-                className="px-6 py-2 bg-gray-900 text-white rounded-md hover:bg-gray-800 transition-colors"
-                aria-label="Load more products"
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 text-gray-700"
               >
-                Load More Products
+                Previous
               </button>
-            </div>
-          )}
 
-          {!hasMore && products.length > 0 && (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              All products loaded
-            </div>
+              <div className="flex items-center gap-1 mx-2">
+                {getPageNumbers().map((page, idx) =>
+                  page === "…" ? (
+                    <span
+                      key={`ellipsis-${idx}`}
+                      className="w-9 text-center text-gray-400 text-sm select-none"
+                    >
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`w-9 h-9 text-sm font-medium rounded-md transition-colors ${
+                        page === currentPage
+                          ? "bg-gray-900 text-white"
+                          : "text-gray-600 hover:bg-gray-100 border border-gray-200"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+              </div>
+
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 text-sm font-medium border border-gray-200 rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 text-gray-700"
+              >
+                Next
+              </button>
+            </nav>
           )}
         </>
       ) : (
