@@ -1,7 +1,8 @@
-import { Menu, Search, ShoppingBag, User, X, LogOut } from "lucide-react";
+import { Menu, Search, ShoppingBag, User, X, LogOut, ChevronDown } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import authService from "../../appwrite/auth";
+import productService from "../../appwrite/config";
 import conf from "../../conf/conf";
 import { Client, Databases, Query } from "appwrite";
 
@@ -10,12 +11,16 @@ const Header = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [isShopOpen, setIsShopOpen] = useState(false);
+  const [mobileShopExpanded, setMobileShopExpanded] = useState(false);
   const location = useLocation();
 
-  // Refs
-  const desktopSearchRef = useRef(null); // wraps the desktop overlay
-  const mobileSearchRef = useRef(null); // wraps the mobile search bar
-  const menuRef = useRef(null); // wraps the mobile menu panel
+  const desktopSearchRef = useRef(null);
+  const mobileSearchRef = useRef(null);
+  const menuRef = useRef(null);
+  const shopDropdownRef = useRef(null);
+  const shopTimeoutRef = useRef(null);
 
   const navigate = useNavigate();
   const DATABASE_ID = conf.appwriteDatabaseId;
@@ -51,10 +56,29 @@ const Header = () => {
     };
   }, []);
 
+  // Fetch categories for the Shop dropdown
+  useEffect(() => {
+    let mounted = true;
+    productService
+      .listCategories()
+      .then((res) => {
+        if (mounted && res?.documents) setCategories(res.documents);
+      })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, []);
+
+  // Close dropdowns on route change
+  useEffect(() => {
+    setIsShopOpen(false);
+    setMobileShopExpanded(false);
+    setIsMenuOpen(false);
+    setIsSearchOpen(false);
+  }, [location.pathname]);
+
   // Close on outside click (robust)
   useEffect(() => {
     const onDocMouseDown = (e) => {
-      // If search is open, close only when clicking outside BOTH search containers (desktop & mobile)
       if (isSearchOpen) {
         const inDesktop = desktopSearchRef.current?.contains(e.target);
         const inMobile = mobileSearchRef.current?.contains(e.target);
@@ -63,7 +87,6 @@ const Header = () => {
         }
       }
 
-      // If mobile menu is open, close when clicking outside it
       if (
         isMenuOpen &&
         menuRef.current &&
@@ -71,12 +94,21 @@ const Header = () => {
       ) {
         setIsMenuOpen(false);
       }
+
+      if (
+        isShopOpen &&
+        shopDropdownRef.current &&
+        !shopDropdownRef.current.contains(e.target)
+      ) {
+        setIsShopOpen(false);
+      }
     };
 
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         setIsSearchOpen(false);
         setIsMenuOpen(false);
+        setIsShopOpen(false);
       }
     };
 
@@ -86,7 +118,7 @@ const Header = () => {
       document.removeEventListener("mousedown", onDocMouseDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [isSearchOpen, isMenuOpen]);
+  }, [isSearchOpen, isMenuOpen, isShopOpen]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -184,18 +216,107 @@ const Header = () => {
             </Link>
 
             <nav className="flex space-x-8">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  className="text-sm font-medium tracking-wide transition-colors duration-200"
-                  style={({ isActive }) => ({
-                    color: isActive ? colors.mediumGreen : colors.darkGreen,
-                  })}
-                >
-                  {item.name}
-                </NavLink>
-              ))}
+              {navItems.map((item) =>
+                item.name === "Shop" ? (
+                  <div
+                    key={item.path}
+                    className="relative"
+                    ref={shopDropdownRef}
+                    onMouseEnter={() => {
+                      clearTimeout(shopTimeoutRef.current);
+                      setIsShopOpen(true);
+                    }}
+                    onMouseLeave={() => {
+                      shopTimeoutRef.current = setTimeout(() => setIsShopOpen(false), 200);
+                    }}
+                  >
+                    <button
+                      className="text-sm font-medium tracking-wide transition-colors duration-200 flex items-center gap-1"
+                      style={{
+                        color: location.pathname.startsWith("/shop") || location.pathname.startsWith("/category")
+                          ? colors.mediumGreen
+                          : colors.darkGreen,
+                      }}
+                      onClick={() => navigate("/shop")}
+                    >
+                      Shop
+                      <ChevronDown
+                        className="w-3.5 h-3.5 transition-transform duration-200"
+                        style={{ transform: isShopOpen ? "rotate(180deg)" : "rotate(0)" }}
+                      />
+                    </button>
+
+                    {isShopOpen && (
+                      <div
+                        className="absolute top-full left-1/2 -translate-x-1/2 pt-3"
+                        style={{ minWidth: "220px" }}
+                      >
+                        <div
+                          className="bg-white rounded-xl shadow-xl border border-gray-100 py-2 overflow-hidden"
+                          style={{ animation: "shopDropdownIn 0.2s ease-out" }}
+                        >
+                          <Link
+                            to="/shop"
+                            className="flex items-center px-5 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50"
+                            style={{ color: colors.darkGreen }}
+                          >
+                            View All Products
+                          </Link>
+
+                          {categories.length > 0 && (
+                            <div className="mx-4 my-1 border-t border-gray-100" />
+                          )}
+
+                          {categories.map((cat) => (
+                            <Link
+                              key={cat.$id}
+                              to={`/category/${encodeURIComponent(cat.name.toLowerCase())}`}
+                              className="flex items-center gap-3 px-5 py-2.5 text-sm transition-colors hover:bg-gray-50 group"
+                              style={{ color: colors.darkGreen }}
+                            >
+                              {cat.image && (
+                                <img
+                                  src={cat.image}
+                                  alt=""
+                                  className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+                                  loading="lazy"
+                                />
+                              )}
+                              <span className="group-hover:translate-x-0.5 transition-transform duration-150">
+                                {cat.name}
+                              </span>
+                            </Link>
+                          ))}
+
+                          {categories.length > 0 && (
+                            <>
+                              <div className="mx-4 my-1 border-t border-gray-100" />
+                              <Link
+                                to="/collections"
+                                className="flex items-center px-5 py-2.5 text-xs font-medium uppercase tracking-wider transition-colors hover:bg-gray-50"
+                                style={{ color: colors.mediumGreen }}
+                              >
+                                Browse All Collections
+                              </Link>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className="text-sm font-medium tracking-wide transition-colors duration-200"
+                    style={({ isActive }) => ({
+                      color: isActive ? colors.mediumGreen : colors.darkGreen,
+                    })}
+                  >
+                    {item.name}
+                  </NavLink>
+                )
+              )}
             </nav>
 
             <div className="flex items-center space-x-6">
@@ -321,15 +442,20 @@ const Header = () => {
             </div>
           </div>
 
-          {/* Mobile-only quick nav bar: Shop / Collections */}
+          {/* Mobile-only quick nav bar */}
           <nav className="px-4 pt-1 pb-1">
             <div className="flex justify-center gap-6 text-sm font-medium">
-              <Link
-                to="/shop"
+              <button
+                onClick={() => setIsShopOpen((v) => !v)}
+                className="flex items-center gap-1"
                 style={{ color: colors.darkGreen }}
               >
                 Shop
-              </Link>
+                <ChevronDown
+                  className="w-3.5 h-3.5 transition-transform duration-200"
+                  style={{ transform: isShopOpen ? "rotate(180deg)" : "rotate(0)" }}
+                />
+              </button>
               <Link
                 to="/collections"
                 style={{ color: colors.darkGreen }}
@@ -337,6 +463,44 @@ const Header = () => {
                 Collections
               </Link>
             </div>
+
+            {isShopOpen && (
+              <div
+                className="mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 mx-auto max-w-sm overflow-hidden"
+                style={{ animation: "shopDropdownIn 0.2s ease-out" }}
+              >
+                <Link
+                  to="/shop"
+                  className="block px-5 py-2.5 text-sm font-medium transition-colors hover:bg-gray-50"
+                  style={{ color: colors.darkGreen }}
+                >
+                  View All Products
+                </Link>
+
+                {categories.length > 0 && (
+                  <div className="mx-4 my-1 border-t border-gray-100" />
+                )}
+
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.$id}
+                    to={`/category/${encodeURIComponent(cat.name.toLowerCase())}`}
+                    className="flex items-center gap-3 px-5 py-2.5 text-sm transition-colors hover:bg-gray-50"
+                    style={{ color: colors.darkGreen }}
+                  >
+                    {cat.image && (
+                      <img
+                        src={cat.image}
+                        alt=""
+                        className="w-7 h-7 rounded-lg object-cover flex-shrink-0"
+                        loading="lazy"
+                      />
+                    )}
+                    <span>{cat.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
           </nav>
 
           {isSearchOpen && (
@@ -387,19 +551,81 @@ const Header = () => {
               ref={menuRef}
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <nav className="flex flex-col space-y-4">
-                {navItems.map((item) => (
-                  <NavLink
-                    key={item.path}
-                    to={item.path}
-                    style={({ isActive }) => ({
-                      color: isActive ? colors.mediumGreen : colors.darkGreen,
-                    })}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {item.name}
-                  </NavLink>
-                ))}
+              <nav className="flex flex-col space-y-1">
+                {navItems.map((item) =>
+                  item.name === "Shop" ? (
+                    <div key={item.path}>
+                      <button
+                        className="w-full flex items-center justify-between py-2 text-base font-medium"
+                        style={{
+                          color:
+                            location.pathname.startsWith("/shop") || location.pathname.startsWith("/category")
+                              ? colors.mediumGreen
+                              : colors.darkGreen,
+                        }}
+                        onClick={() => setMobileShopExpanded((v) => !v)}
+                      >
+                        Shop
+                        <ChevronDown
+                          className="w-4 h-4 transition-transform duration-200"
+                          style={{ transform: mobileShopExpanded ? "rotate(180deg)" : "rotate(0)" }}
+                        />
+                      </button>
+
+                      {mobileShopExpanded && (
+                        <div className="pl-4 pb-2 flex flex-col space-y-1">
+                          <Link
+                            to="/shop"
+                            className="py-2 text-sm font-medium transition-colors"
+                            style={{ color: colors.darkGreen }}
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            All Products
+                          </Link>
+                          {categories.map((cat) => (
+                            <Link
+                              key={cat.$id}
+                              to={`/category/${encodeURIComponent(cat.name.toLowerCase())}`}
+                              className="flex items-center gap-2.5 py-2 text-sm transition-colors"
+                              style={{ color: colors.darkGreen }}
+                              onClick={() => setIsMenuOpen(false)}
+                            >
+                              {cat.image && (
+                                <img
+                                  src={cat.image}
+                                  alt=""
+                                  className="w-6 h-6 rounded-md object-cover flex-shrink-0"
+                                  loading="lazy"
+                                />
+                              )}
+                              {cat.name}
+                            </Link>
+                          ))}
+                          <Link
+                            to="/collections"
+                            className="py-2 text-xs font-medium uppercase tracking-wider transition-colors"
+                            style={{ color: colors.mediumGreen }}
+                            onClick={() => setIsMenuOpen(false)}
+                          >
+                            Browse All Collections
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <NavLink
+                      key={item.path}
+                      to={item.path}
+                      className="py-2 text-base"
+                      style={({ isActive }) => ({
+                        color: isActive ? colors.mediumGreen : colors.darkGreen,
+                      })}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      {item.name}
+                    </NavLink>
+                  )
+                )}
               </nav>
 
               <div
