@@ -83,6 +83,8 @@
   <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
   <link rel="dns-prefetch" href="https://cdn.debugbear.com">
   <link rel="dns-prefetch" href="https://connect.facebook.net">
+  <link rel="preconnect" href="https://www.clarity.ms" crossorigin>
+  <link rel="dns-prefetch" href="https://www.clarity.ms">
 
   <!-- Preload Appwrite SDK so it's ready before checkout (critical for in-app browsers) -->
   <link rel="preload" href="https://cdn.jsdelivr.net/npm/appwrite@14.0.1" as="script">
@@ -562,34 +564,13 @@
     (function(){var dbpr=100;if(Math.random()*100>100-dbpr){var d="dbbRum",w=window,o=document,a=addEventListener,scr=o.createElement("script");scr.async=!0;w[d]=w[d]||[];w[d].push(["presampling",dbpr]);["error","unhandledrejection"].forEach(function(t){a(t,function(e){w[d].push([t,e])});});scr.src="https://cdn.debugbear.com/mGylJjrwEf9j.js";o.head.appendChild(scr);}})()
   </script>
 
-  <!-- Hotjar - User behavior analytics (production only) -->
-  <!-- TODO: Replace YOUR_HOTJAR_SITE_ID with your actual Hotjar Site ID (numeric, e.g., 1234567) -->
-  <!-- To remove Hotjar later, delete this entire script block (lines 139-152) -->
-  <script>
-    (function() {
-      // Only load Hotjar in production (not during development, localhost, or tests)
-      var isProduction = typeof window !== 'undefined' && 
-        window.location.hostname !== 'localhost' && 
-        window.location.hostname !== '127.0.0.1' &&
-        !window.location.hostname.includes('localhost') &&
-        window.location.protocol === 'https:';
-      
-      if (isProduction) {
-        // IMPORTANT: Replace 0 with your actual Hotjar Site ID (numeric, e.g., 1234567)
-        // The provided script appears to be ContentSquare - please provide your Hotjar Site ID instead
-        var HOTJAR_SITE_ID = 0; // TODO: Replace 0 with your Hotjar Site ID from https://insights.hotjar.com/settings/sites
-        if (HOTJAR_SITE_ID && HOTJAR_SITE_ID !== 0 && typeof HOTJAR_SITE_ID === 'number') {
-          (function(h,o,t,j,a,r){
-            h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};
-            h._hjSettings={hjid:HOTJAR_SITE_ID,hjsv:6};
-            a=o.getElementsByTagName('head')[0];
-            r=o.createElement('script');r.async=1;
-            r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;
-            a.appendChild(r);
-          })(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');
-        }
-      }
-    })();
+  <!-- Microsoft Clarity - Session recordings & heatmaps (Project ID: uynsdkk298) -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "uynsdkk298");
   </script>
 </head>
 
