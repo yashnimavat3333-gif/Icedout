@@ -12,7 +12,7 @@
  *   orderDate*      – datetime (ISO string)
  *   billingAddress* – string
  *   items*          – string (JSON)
- *   Shippingphone*  – string
+ *   shippingphone*  – string
  *   amount*         – integer
  *   customerId      – integer
  *   totalAmount     – integer
@@ -30,7 +30,6 @@
 
 import { Client, Databases, ID } from "node-appwrite";
 
-// ── Initialise Appwrite server client (cold-start cached) ──
 let client = null;
 let databases = null;
 
@@ -57,7 +56,6 @@ function getClient() {
 }
 
 export default async function handler(req, res) {
-  // ── Only accept POST ──
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
@@ -74,18 +72,18 @@ export default async function handler(req, res) {
   try {
     const { databases: db } = getClient();
 
-    // ── Parse incoming body ──
     const body = req.body || {};
 
-    // Extract coupon metadata (not stored in the order document)
     const couponId   = body._couponId   || "";
     const couponCode = body._couponCode || "";
 
-    // ── Build document matching EXACT Appwrite schema ──
+    // PayPal reference info (logged for traceability, not stored in Appwrite schema)
+    const paypalOrderId = body.paypalOrderId || "";
+    const paypalTransactionId = body.paypalTransactionId || "";
+
     const safeStr = (v) => (v == null ? "" : String(v));
     const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
 
-    // Normalize items: ensure each item retains id, name, price, quantity, size
     let parsedItems = [];
     try {
       parsedItems = typeof body.items === "string"
@@ -104,16 +102,42 @@ export default async function handler(req, res) {
       sku:      safeStr(it.sku),
     }));
 
+    const shippingPhone = safeStr(
+      body.shippingphone || body.shipping_phone || body.Shippingphone
+    );
+
+    // Server-side validation of required fields
+    const validationErrors = [];
+
+    if (!shippingPhone.trim()) {
+      validationErrors.push("Shipping phone is required");
+    }
+    if (!safeStr(body.billingAddress).trim()) {
+      validationErrors.push("Billing address is required");
+    }
+    if (normalizedItems.length === 0) {
+      validationErrors.push("Order must contain at least one item");
+    }
+    if (safeInt(body.amount) <= 0) {
+      validationErrors.push("Order amount must be greater than zero");
+    }
+
+    if (validationErrors.length > 0) {
+      console.error("[create-order] Validation failed:", validationErrors);
+      return res.status(400).json({
+        error: validationErrors.join(". "),
+        validationErrors,
+      });
+    }
+
     const doc = {
-      // ── Required fields ──
       orderId:        Date.now(),
       orderDate:      new Date().toISOString(),
       billingAddress: safeStr(body.billingAddress),
       items:          JSON.stringify(normalizedItems),
-      shippingphone:  safeStr(body.shipping_phone || body.shippingphone || body.Shippingphone),
+      shippingphone:  shippingPhone,
       amount:         safeInt(body.amount),
 
-      // ── Optional fields ──
       customerId:     Date.now() + Math.floor(Math.random() * 1000),
       totalAmount:    safeInt(body.totalAmount || body.amount),
       shippingAddress: safeStr(body.shippingAddress),
@@ -123,8 +147,10 @@ export default async function handler(req, res) {
     console.log("[create-order] Incoming body:", {
       email: body.email,
       amount: body.amount,
-      shippingphone: body.shipping_phone || body.shippingphone || body.Shippingphone,
+      shippingphone: shippingPhone,
       itemsLength: doc.items.length,
+      paypalOrderId,
+      paypalTransactionId,
     });
 
     console.log("[create-order] Document to save:", {
@@ -134,7 +160,6 @@ export default async function handler(req, res) {
       fieldCount: Object.keys(doc).length,
     });
 
-    // ── Create order document ──
     const response = await db.createDocument(
       databaseId,
       collectionId,
@@ -142,9 +167,8 @@ export default async function handler(req, res) {
       doc
     );
 
-    console.log("[create-order] ✅ Order saved:", response.$id);
+    console.log("[create-order] Order saved:", response.$id, "| PayPal:", paypalOrderId);
 
-    // ── Increment coupon usage (best-effort) ──
     if (couponId && couponsCollectionId) {
       try {
         const couponDoc = await db.getDocument(
@@ -161,7 +185,6 @@ export default async function handler(req, res) {
         );
         console.log("[create-order] Coupon usage incremented:", couponCode, currentUsage + 1);
       } catch (couponErr) {
-        // Non-fatal: order is already saved
         console.warn("[create-order] Coupon increment failed (non-fatal):", couponErr?.message);
       }
     }
@@ -171,7 +194,7 @@ export default async function handler(req, res) {
       orderId: response.$id,
     });
   } catch (error) {
-    console.error("[create-order] ❌ Order creation failed:", {
+    console.error("[create-order] Order creation failed:", {
       message: error?.message,
       code: error?.code,
       type: error?.type,
