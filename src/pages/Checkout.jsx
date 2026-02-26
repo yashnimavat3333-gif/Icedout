@@ -238,6 +238,9 @@ const CheckoutPage = () => {
   const [wiseLoading, setWiseLoading] = useState(false);
   const [wiseError, setWiseError] = useState(null);
 
+  const [applePayEmail, setApplePayEmail] = useState("");
+  const [applePayError, setApplePayError] = useState("");
+
   // Payment-first flow: captured order + missing-fields prompt
   const [capturedPaypalOrder, setCapturedPaypalOrder] = useState(null);
   const [pendingMergedData, setPendingMergedData] = useState(null);
@@ -1025,6 +1028,28 @@ const CheckoutPage = () => {
     }
   };
 
+  const handleApplePayWhatsApp = () => {
+    const email = applePayEmail.trim();
+    if (!email || !email.includes("@")) {
+      setApplePayError("Please enter a valid email address.");
+      return;
+    }
+    setApplePayError("");
+
+    const items = cartItemsRef.current || cartItems;
+    const productNames = items.map((it) => it.name || "Item").join(", ");
+    const total = (finalAmountRef.current || finalAmount || 0).toFixed(2);
+
+    const message =
+      `Hi, I want to pay with Apple Pay.\n` +
+      `My email: ${email}\n` +
+      `Product: ${productNames}\n` +
+      `Amount: $${total}`;
+
+    const url = `https://wa.me/+918850840154?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+  };
+
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
 
   const inputClasses = (fieldName) =>
@@ -1525,6 +1550,44 @@ const CheckoutPage = () => {
                       <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-800">{wiseError}</p>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Apple Pay via WhatsApp */}
+                {!capturedPaypalOrder && (
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <p className="text-base font-semibold text-gray-800 mb-1">
+                      🍎 Want to pay with Apple Pay?
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Enter your email and we'll send you a secure Apple Pay link via WhatsApp.
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="email"
+                        value={applePayEmail}
+                        onChange={(e) => {
+                          setApplePayEmail(e.target.value);
+                          if (applePayError) setApplePayError("");
+                        }}
+                        placeholder="you@example.com"
+                        className={`flex-1 px-4 py-3 border rounded-lg text-sm outline-none transition-colors duration-200 focus:ring-2 focus:ring-green-500 ${
+                          applePayError
+                            ? "border-red-400 bg-red-50"
+                            : "border-gray-300 focus:border-green-500"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleApplePayWhatsApp}
+                        className="px-5 py-3 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg transition-colors duration-200 whitespace-nowrap"
+                      >
+                        Continue via WhatsApp
+                      </button>
+                    </div>
+                    {applePayError && (
+                      <p className="mt-2 text-sm text-red-600">{applePayError}</p>
                     )}
                   </div>
                 )}
