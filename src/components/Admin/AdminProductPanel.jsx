@@ -21,12 +21,18 @@ const AdminProductPanel = () => {
 
   const checkAdmin = async () => {
     const user = await authService.getCurrentUser();
-    if (user && user.labels?.includes("admin")) {
+    console.log("Admin Check:", user);
+
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    if (Array.isArray(conf.adminUserIds) && conf.adminUserIds.includes(user.$id)) {
       setIsAdmin(true);
       fetchProducts();
-    } else {
-      navigate("/not-authorized"); // or home
     }
+
     setLoading(false);
   };
 
@@ -42,7 +48,16 @@ const AdminProductPanel = () => {
 
   if (loading) return <SpinnerLoader />;
 
-  return isAdmin ? (
+  if (!isAdmin) {
+    return (
+      <div style={{padding: "40px", textAlign: "center"}}>
+        <h2>Access Denied</h2>
+        <p>You do not have permission to view this page.</p>
+      </div>
+    );
+  }
+
+  return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Admin Product Panel</h1>
@@ -157,7 +172,7 @@ const AdminProductPanel = () => {
         </div>
       )}
     </div>
-  ) : null;
+  );
 };
 
 export default AdminProductPanel;
