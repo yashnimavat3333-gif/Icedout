@@ -12,7 +12,6 @@ import PostForm from "./form/PostForm";
 import PostCard from "./PostCard";
 import AuthLayout from "./AuthLayout";
 import Input from "./Input";
-import PayPalPayment from "./PayPalPayment";
 export {
     Header,
     Footer,
@@ -28,5 +27,4 @@ export {
     AuthLayout,
     Input,
     Select,
-    PayPalPayment,
 }
