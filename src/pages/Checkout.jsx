@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
-import CheckoutPayPalSection from "../components/checkout/CheckoutPayPalSection";
+import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
@@ -215,6 +215,7 @@ const CheckoutPage = () => {
   const formDataRef = useRef(formData);
   const finalAmountRef = useRef(0);
   const cartItemsRef = useRef([]);
+  const appliedCouponRef = useRef(null);
 
   const cartItems = Array.isArray(cart) ? cart : [];
   const subtotalAmount =
@@ -296,6 +297,7 @@ const CheckoutPage = () => {
   }, [appliedCoupon, subtotalAmount]);
 
   useEffect(() => { finalAmountRef.current = finalAmount; }, [finalAmount]);
+  useEffect(() => { appliedCouponRef.current = appliedCoupon; }, [appliedCoupon]);
 
   const currentStep = useMemo(() => {
     if (orderStatus?.type === "success") return 3;
@@ -387,7 +389,7 @@ const CheckoutPage = () => {
     setCouponError("");
   };
 
-  const validateShippingForm = () => {
+  const validateShippingFields = () => {
     const fd = formDataRef.current || formData;
     const newErrors = {};
 
@@ -404,15 +406,53 @@ const CheckoutPage = () => {
       setErrors(newErrors);
       return "Please fill in all shipping details above before proceeding.";
     }
-
     setErrors({});
     return null;
   };
 
+  const buildPayPalCartPayload = () => {
+    const items = (cartItemsRef.current || cartItems).map((it) => ({
+      productId: it.$id ?? it.id,
+      quantity: it.quantity || 1,
+      variationName:
+        it.selectedVariation?.name ?? it.selectedVariation?.title ?? null,
+    }));
+    const coupon = appliedCouponRef.current;
+    return {
+      items,
+      couponCode: coupon?.code || null,
+    };
+  };
+
+  const handlePayPalPaid = async ({ orderID, captureId }) => {
+    const fd = formDataRef.current || formData;
+    const items = cartItemsRef.current || cartItems;
+    const shippingAddress = `${fd.fullName}, ${fd.address}, ${fd.city}, ${fd.zipCode}, ${fd.country} — ${fd.email} — ${fd.phone}`;
+
+    setCompletedOrder({
+      orderId: captureId || orderID,
+      shippingAddress,
+      items: items.map((it) => ({
+        name: it.name || "Item",
+        quantity: it.quantity || 1,
+        price: Number(it.price) || 0,
+        size: it.selectedSize || null,
+      })),
+    });
+    setOrderStatus({
+      type: "success",
+      message: "Payment successful! Thank you for your order.",
+    });
+    setPaypalError("");
+    try {
+      if (typeof clearCart === "function") clearCart();
+    } catch {}
+  };
+
   const handleApplePayWhatsApp = () => {
-    const validationMessage = validateShippingForm();
-    if (validationMessage) {
-      setApplePayError(validationMessage);
+    const shippingErr = validateShippingFields();
+    if (shippingErr) {
+      setApplePayError(shippingErr);
       return;
     }
 
@@ -436,40 +476,6 @@ const CheckoutPage = () => {
 
     const url = `https://wa.me/+918850840154?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
-  };
-
-  const handlePayPalSuccess = (payload) => {
-    setPaypalError("");
-    setApplePayError("");
-    try {
-      if (typeof clearCart === "function") clearCart();
-    } catch (e) {
-      console.warn("clearCart after PayPal:", e);
-    }
-
-    const orderRecord = {
-      $id: payload.appwriteDocId,
-      orderId: payload.appwriteDocId || payload.paypalOrderId,
-      shippingAddress: payload.shippingAddress,
-      items: payload.items || cartItems,
-      totalAmount: payload.amount,
-      paypalOrderId: payload.paypalOrderId,
-      paypalTransactionId: payload.paypalTransactionId,
-    };
-
-    setCompletedOrder(orderRecord);
-    setOrderStatus({
-      type: "success",
-      message:
-        "Thank you! Your PayPal payment was captured successfully. We will process your order shortly.",
-    });
-    setCurrentPageLocal("success");
-  };
-
-  const handlePayPalFailure = (err) => {
-    const message = err?.message || "PayPal payment failed. Please try again.";
-    setPaypalError(message);
-    setOrderStatus({ type: "error", message });
   };
 
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
@@ -782,7 +788,7 @@ const CheckoutPage = () => {
                 Shipping Information
               </h2>
               <p className="text-sm text-gray-500 mb-6">
-                Fill in your details below, then choose WhatsApp or PayPal checkout.
+                Fill in your details below to proceed with Apple Pay checkout.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -952,25 +958,21 @@ const CheckoutPage = () => {
                   {applePayError && (
                     <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
                   )}
+
+                  <CheckoutPayPalButtons
+                    buildCartPayload={buildPayPalCartPayload}
+                    validateShipping={validateShippingFields}
+                    onPaid={handlePayPalPaid}
+                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
+                  />
+                  {paypalError && (
+                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                  )}
                 </div>
-
-                <CheckoutPayPalSection
-                  cartItems={cartItems}
-                  appliedCoupon={appliedCoupon}
-                  formData={formData}
-                  validateShipping={validateShippingForm}
-                  onSuccess={handlePayPalSuccess}
-                  onError={handlePayPalFailure}
-                  finalAmount={finalAmount}
-                />
-
-                {paypalError && (
-                  <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
-                )}
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
                   <Lock className="w-4 h-4" />
-                  <span>Secure checkout — WhatsApp or PayPal</span>
+                  <span>Secure payment via Apple Pay</span>
                 </div>
               </div>
             </div>
