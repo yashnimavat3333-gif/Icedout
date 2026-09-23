@@ -82,7 +82,11 @@ export default async function handler(req, res) {
     const paypalTransactionId = body.paypalTransactionId || "";
 
     const safeStr = (v) => (v == null ? "" : String(v));
-    const safeInt = (v) => { const n = parseInt(v, 10); return isNaN(n) ? 0 : n; };
+    const safeMoney = (v) => {
+      const n = parseFloat(v);
+      if (!Number.isFinite(n) || n <= 0) return 0;
+      return Math.round(n * 100) / 100;
+    };
 
     let parsedItems = [];
     try {
@@ -118,7 +122,7 @@ export default async function handler(req, res) {
     if (normalizedItems.length === 0) {
       validationErrors.push("Order must contain at least one item");
     }
-    if (safeInt(body.amount) <= 0) {
+    if (safeMoney(body.amount) <= 0) {
       validationErrors.push("Order amount must be greater than zero");
     }
 
@@ -136,10 +140,10 @@ export default async function handler(req, res) {
       billingAddress: safeStr(body.billingAddress),
       items:          JSON.stringify(normalizedItems),
       shippingphone:  shippingPhone,
-      amount:         safeInt(body.amount),
+      amount:         safeMoney(body.amount),
 
       customerId:     Date.now() + Math.floor(Math.random() * 1000),
-      totalAmount:    safeInt(body.totalAmount || body.amount),
+      totalAmount:    safeMoney(body.totalAmount || body.amount),
       shippingAddress: safeStr(body.shippingAddress),
       orderStatus:    "pending",
     };

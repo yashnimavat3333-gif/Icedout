@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
+import CheckoutPayPalSection from "../components/checkout/CheckoutPayPalSection";
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
@@ -207,6 +208,7 @@ const CheckoutPage = () => {
   const [userOrders, setUserOrders] = useState([]);
 
   const [applePayError, setApplePayError] = useState("");
+  const [paypalError, setPaypalError] = useState("");
 
   const formRef = useRef(null);
 
@@ -385,7 +387,7 @@ const CheckoutPage = () => {
     setCouponError("");
   };
 
-  const handleApplePayWhatsApp = () => {
+  const validateShippingForm = () => {
     const fd = formDataRef.current || formData;
     const newErrors = {};
 
@@ -400,12 +402,22 @@ const CheckoutPage = () => {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      setApplePayError("Please fill in all shipping details above before proceeding.");
-      return;
+      return "Please fill in all shipping details above before proceeding.";
     }
 
     setErrors({});
+    return null;
+  };
+
+  const handleApplePayWhatsApp = () => {
+    const validationMessage = validateShippingForm();
+    if (validationMessage) {
+      setApplePayError(validationMessage);
+      return;
+    }
+
     setApplePayError("");
+    const fd = formDataRef.current || formData;
 
     const items = cartItemsRef.current || cartItems;
     const productLines = items
@@ -424,6 +436,40 @@ const CheckoutPage = () => {
 
     const url = `https://wa.me/+918850840154?text=${encodeURIComponent(message)}`;
     window.open(url, "_blank");
+  };
+
+  const handlePayPalSuccess = (payload) => {
+    setPaypalError("");
+    setApplePayError("");
+    try {
+      if (typeof clearCart === "function") clearCart();
+    } catch (e) {
+      console.warn("clearCart after PayPal:", e);
+    }
+
+    const orderRecord = {
+      $id: payload.appwriteDocId,
+      orderId: payload.appwriteDocId || payload.paypalOrderId,
+      shippingAddress: payload.shippingAddress,
+      items: payload.items || cartItems,
+      totalAmount: payload.amount,
+      paypalOrderId: payload.paypalOrderId,
+      paypalTransactionId: payload.paypalTransactionId,
+    };
+
+    setCompletedOrder(orderRecord);
+    setOrderStatus({
+      type: "success",
+      message:
+        "Thank you! Your PayPal payment was captured successfully. We will process your order shortly.",
+    });
+    setCurrentPageLocal("success");
+  };
+
+  const handlePayPalFailure = (err) => {
+    const message = err?.message || "PayPal payment failed. Please try again.";
+    setPaypalError(message);
+    setOrderStatus({ type: "error", message });
   };
 
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
@@ -736,7 +782,7 @@ const CheckoutPage = () => {
                 Shipping Information
               </h2>
               <p className="text-sm text-gray-500 mb-6">
-                Fill in your details below to proceed with Apple Pay checkout.
+                Fill in your details below, then choose WhatsApp or PayPal checkout.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -908,9 +954,23 @@ const CheckoutPage = () => {
                   )}
                 </div>
 
+                <CheckoutPayPalSection
+                  cartItems={cartItems}
+                  appliedCoupon={appliedCoupon}
+                  formData={formData}
+                  validateShipping={validateShippingForm}
+                  onSuccess={handlePayPalSuccess}
+                  onError={handlePayPalFailure}
+                  finalAmount={finalAmount}
+                />
+
+                {paypalError && (
+                  <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                )}
+
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
                   <Lock className="w-4 h-4" />
-                  <span>Secure payment via Apple Pay</span>
+                  <span>Secure checkout — WhatsApp or PayPal</span>
                 </div>
               </div>
             </div>
