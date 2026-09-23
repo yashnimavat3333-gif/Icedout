@@ -26,17 +26,35 @@ function getAppwrite() {
   return { databases, databaseId, productsCollectionId, couponsCollectionId };
 }
 
+function parseVariationEntry(entry) {
+  if (entry && typeof entry === "object") return entry;
+  if (typeof entry === "string") {
+    try {
+      const o = JSON.parse(entry);
+      return o && typeof o === "object" ? o : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Appwrite stores each variation as a JSON string in the array (see ProductForm). */
 function parseVariations(raw) {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw === "string") {
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (typeof raw === "string") {
     try {
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      list = Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
+  } else {
+    return [];
   }
-  return [];
+  return list.map(parseVariationEntry).filter(Boolean);
 }
 
 function unitPriceFromProduct(doc, variationName) {
