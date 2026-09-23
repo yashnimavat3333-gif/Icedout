@@ -200,7 +200,7 @@ const Header = () => {
             textOverflow: 'ellipsis'
           }}
         >
-          FREE WORLDWIDE SHIPPING / EASY PAYPAL PAYMENT PLANS AVAILABLE
+          FREE WORLDWIDE SHIPPING  /  SECURE PAYPAL PAYMENT  /  7 DAYS EASY RETURNS
         </div>
         
      

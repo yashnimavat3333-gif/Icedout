@@ -28,7 +28,9 @@ export default defineConfig({
     minify: 'esbuild',
   },
   server: {
+    host: '127.0.0.1',
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api/appwrite': {
         target: 'https://fra.cloud.appwrite.io',
