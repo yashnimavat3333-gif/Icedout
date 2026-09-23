@@ -10,6 +10,10 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
+
+/** Set to true to show PayPal on checkout again. */
+const SHOW_PAYPAL_CHECKOUT = false;
+
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
@@ -959,14 +963,18 @@ const CheckoutPage = () => {
                     <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
                   )}
 
-                  <CheckoutPayPalButtons
-                    buildCartPayload={buildPayPalCartPayload}
-                    validateShipping={validateShippingFields}
-                    onPaid={handlePayPalPaid}
-                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
-                  />
-                  {paypalError && (
-                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                  {SHOW_PAYPAL_CHECKOUT && (
+                    <>
+                      <CheckoutPayPalButtons
+                        buildCartPayload={buildPayPalCartPayload}
+                        validateShipping={validateShippingFields}
+                        onPaid={handlePayPalPaid}
+                        onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
+                      />
+                      {paypalError && (
+                        <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                      )}
+                    </>
                   )}
                 </div>
 
