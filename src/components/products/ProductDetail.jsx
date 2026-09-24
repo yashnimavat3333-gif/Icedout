@@ -1195,6 +1195,11 @@ export default function ProductDetail() {
           </button>
         </div>
 
+        <div className="mt-3 text-center text-xs text-gray-600 leading-relaxed">
+          <p className="font-medium text-gray-700">Secure checkout with PayPal</p>
+          <p>Pay securely with PayPal at checkout.</p>
+        </div>
+
         {/* Risk Reversal Reassurance Section */}
         <div className="pt-5 pb-3 space-y-3 border-t border-gray-100 mt-4">
           <div className="flex items-start">

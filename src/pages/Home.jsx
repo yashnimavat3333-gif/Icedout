@@ -46,9 +46,13 @@ function Home() {
               <span aria-hidden="true">✓</span>
               <span>7-Day Easy Returns</span>
             </div>
-            <div className="flex items-center gap-2 justify-center md:justify-start md:ml-0 col-span-2 md:col-span-1">
+            <div className="flex items-center gap-2 justify-center md:justify-start">
               <span aria-hidden="true">✓</span>
               <span>Secure Apple Pay Checkout</span>
+            </div>
+            <div className="flex items-center gap-2 justify-center md:justify-start">
+              <span aria-hidden="true">✓</span>
+              <span>Secure PayPal Checkout</span>
             </div>
           </div>
         </div>

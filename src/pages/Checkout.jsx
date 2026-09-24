@@ -12,7 +12,7 @@ import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
 
 /** Set to true to show PayPal on checkout again. */
-const SHOW_PAYPAL_CHECKOUT = false;
+const SHOW_PAYPAL_CHECKOUT = true;
 
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
