@@ -1,12 +1,23 @@
 const PAYPAL_API = "https://api-m.paypal.com";
 
+function trimEnv(value) {
+  if (value == null) return "";
+  return String(value).trim().replace(/^["']|["']$/g, "");
+}
+
 function requireProductionPayPal() {
-  const env = (process.env.PAYPAL_ENVIRONMENT || "").toLowerCase();
+  const env = trimEnv(process.env.PAYPAL_ENVIRONMENT).toLowerCase();
   if (env !== "production") {
     throw new Error("PayPal is configured for production only");
   }
-  const clientId = process.env.PAYPAL_CLIENT_ID;
-  const clientSecret = process.env.PAYPAL_CLIENT_SECRET;
+  const clientId = trimEnv(
+    process.env.PAYPAL_CLIENT_ID ||
+      process.env.PAYPAL_CLINT_ID ||
+      process.env.VITE_PAYPAL_CLIENT_ID
+  );
+  const clientSecret = trimEnv(
+    process.env.PAYPAL_CLIENT_SECRET || process.env.PAYPAL_CLINT_SECRET
+  );
   if (!clientId || !clientSecret) {
     throw new Error("Missing PayPal credentials");
   }
