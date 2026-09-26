@@ -11,9 +11,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
 
-/** Set to true to show PayPal on checkout again. */
-const SHOW_PAYPAL_CHECKOUT = true;
-
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
@@ -211,13 +208,11 @@ const CheckoutPage = () => {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [userOrders, setUserOrders] = useState([]);
 
-  const [applePayError, setApplePayError] = useState("");
   const [paypalError, setPaypalError] = useState("");
 
   const formRef = useRef(null);
 
   const formDataRef = useRef(formData);
-  const finalAmountRef = useRef(0);
   const cartItemsRef = useRef([]);
   const appliedCouponRef = useRef(null);
 
@@ -300,7 +295,6 @@ const CheckoutPage = () => {
     };
   }, [appliedCoupon, subtotalAmount]);
 
-  useEffect(() => { finalAmountRef.current = finalAmount; }, [finalAmount]);
   useEffect(() => { appliedCouponRef.current = appliedCoupon; }, [appliedCoupon]);
 
   const currentStep = useMemo(() => {
@@ -451,35 +445,6 @@ const CheckoutPage = () => {
     try {
       if (typeof clearCart === "function") clearCart();
     } catch {}
-  };
-
-  const handleApplePayWhatsApp = () => {
-    const shippingErr = validateShippingFields();
-    if (shippingErr) {
-      setApplePayError(shippingErr);
-      return;
-    }
-
-    setApplePayError("");
-    const fd = formDataRef.current || formData;
-
-    const items = cartItemsRef.current || cartItems;
-    const productLines = items
-      .map((it) => `${it.name || "Item"} x${it.quantity || 1} — $${(Number(it.price) || 0).toFixed(2)}`)
-      .join("\n");
-    const total = (finalAmountRef.current || finalAmount || 0).toFixed(2);
-
-    const message =
-      `Hi, I want to pay with Apple Pay.\n\n` +
-      `Name: ${fd.fullName}\n` +
-      `Email: ${fd.email}\n` +
-      `Phone: ${fd.phone}\n` +
-      `Address: ${fd.address}, ${fd.city}, ${fd.zipCode}, ${fd.country}\n\n` +
-      `Products:\n${productLines}\n\n` +
-      `Total: $${total}`;
-
-    const url = `https://wa.me/+918850840154?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
   };
 
   const [currentPageLocal, setCurrentPageLocal] = useState("checkout");
@@ -937,50 +902,23 @@ const CheckoutPage = () => {
                 </h3>
 
                 <div className="bg-gray-50 rounded-lg p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                      <span className="text-white text-lg font-bold"></span>
-                    </div>
-                    <div>
-                      <p className="text-base font-semibold text-gray-800">
-                        Pay with Apple Pay
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        Fill in your shipping details above, then tap below to receive a secure Apple Pay link via WhatsApp.
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleApplePayWhatsApp}
-                    className="w-full mt-3 px-5 py-3.5 bg-black hover:bg-gray-900 text-white text-base font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center gap-2"
-                  >
-                     Pay with Apple Pay
-                  </button>
-
-                  {applePayError && (
-                    <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
-                  )}
-
-                  {SHOW_PAYPAL_CHECKOUT && (
-                    <>
-                      <CheckoutPayPalButtons
-                        buildCartPayload={buildPayPalCartPayload}
-                        validateShipping={validateShippingFields}
-                        onPaid={handlePayPalPaid}
-                        onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
-                      />
-                      {paypalError && (
-                        <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
-                      )}
-                    </>
+                  <p className="text-sm text-gray-600 mb-4 text-center">
+                    Fill in your shipping details above, then pay securely with PayPal below.
+                  </p>
+                  <CheckoutPayPalButtons
+                    buildCartPayload={buildPayPalCartPayload}
+                    validateShipping={validateShippingFields}
+                    onPaid={handlePayPalPaid}
+                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
+                  />
+                  {paypalError && (
+                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
                   )}
                 </div>
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
                   <Lock className="w-4 h-4" />
-                  <span>Secure payment via Apple Pay</span>
+                  <span>Secure payment via PayPal</span>
                 </div>
               </div>
             </div>
