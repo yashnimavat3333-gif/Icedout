@@ -11,6 +11,20 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
 
+const RECOVERY_TOKEN_KEY = "iceyout_checkout_recovery_token";
+
+function getOrCreateRecoveryToken() {
+  try {
+    const existing = sessionStorage.getItem(RECOVERY_TOKEN_KEY);
+    if (existing) return existing;
+    const token = crypto.randomUUID();
+    sessionStorage.setItem(RECOVERY_TOKEN_KEY, token);
+    return token;
+  } catch {
+    return "";
+  }
+}
+
 const APPWRITE_ENDPOINT =
   typeof import.meta !== "undefined"
     ? import.meta.env.VITE_APPWRITE_ENDPOINT || import.meta.env.VITE_APPWRITE_URL || "https://cloud.appwrite.io/v1"
@@ -280,6 +294,16 @@ const CheckoutPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
+  useEffect(() => {
+    const state = location.state || {};
+    if (state.checkoutRecovery && state.prefill) {
+      setFormData((prev) => ({ ...prev, ...state.prefill }));
+      if (state.recoveryToken) {
+        try { sessionStorage.setItem(RECOVERY_TOKEN_KEY, state.recoveryToken); } catch {}
+      }
+    }
+  }, [location]);
+
   const { discountAmount, finalAmount, discountPercent } = useMemo(() => {
     if (!appliedCoupon) {
       return { discountAmount: 0, finalAmount: subtotalAmount, discountPercent: 0 };
@@ -296,6 +320,45 @@ const CheckoutPage = () => {
   }, [appliedCoupon, subtotalAmount]);
 
   useEffect(() => { appliedCouponRef.current = appliedCoupon; }, [appliedCoupon]);
+
+  useEffect(() => {
+    const email = (formData.email || "").trim();
+    if (!email || cartItems.length === 0) return undefined;
+    const timer = setTimeout(() => {
+      const recoveryToken = getOrCreateRecoveryToken();
+      if (!recoveryToken) return;
+      const items = (cartItemsRef.current || cartItems).map((it) => ({
+        $id: it.$id ?? it.id,
+        id: it.id ?? it.$id,
+        name: it.name,
+        quantity: it.quantity || 1,
+        price: Number(it.price) || 0,
+        image: it.image || null,
+        selectedSize: it.selectedSize || null,
+        selectedVariation: it.selectedVariation
+          ? { name: it.selectedVariation.name || it.selectedVariation.title || "" }
+          : null,
+        selectedMaterial: it.selectedMaterial || it.material || null,
+        personalizedBox: it.personalizedBox || it.selectedBox || null,
+      }));
+      fetch("/api/abandoned-checkout/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recoveryToken,
+          customerName: formData.fullName || "",
+          customerEmail: email,
+          customerPhone: formData.phone || "",
+          cartItems: items,
+          subtotal: subtotalAmount,
+          shipping: 0,
+          discount: discountAmount,
+          total: finalAmount,
+        }),
+      }).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [formData, cartItems, subtotalAmount, discountAmount, finalAmount]);
 
   const currentStep = useMemo(() => {
     if (orderStatus?.type === "success") return 3;
@@ -444,6 +507,17 @@ const CheckoutPage = () => {
     setPaypalError("");
     try {
       if (typeof clearCart === "function") clearCart();
+    } catch {}
+    try {
+      const recoveryToken = sessionStorage.getItem(RECOVERY_TOKEN_KEY);
+      if (recoveryToken) {
+        fetch("/api/abandoned-checkout/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recoveryToken }),
+        }).catch(() => {});
+        sessionStorage.removeItem(RECOVERY_TOKEN_KEY);
+      }
     } catch {}
   };
 
@@ -902,8 +976,11 @@ const CheckoutPage = () => {
                 </h3>
 
                 <div className="bg-gray-50 rounded-lg p-6">
-                  <p className="text-sm text-gray-600 mb-4 text-center">
+                  <p className="text-sm text-gray-600 mb-2 text-center">
                     Fill in your shipping details above, then pay securely with PayPal below.
+                  </p>
+                  <p className="text-xs text-gray-500 mb-4 text-center leading-relaxed">
+                    Almost yours 💎 We&apos;ll save your selection so you can easily come back and complete your order.
                   </p>
                   <CheckoutPayPalButtons
                     buildCartPayload={buildPayPalCartPayload}
