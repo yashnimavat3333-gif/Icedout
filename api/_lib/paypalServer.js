@@ -50,9 +50,21 @@ function roundMoney(n) {
   return Math.round(Number(n) * 100) / 100;
 }
 
-export async function createPayPalOrder({ amountUsd }) {
+export async function createPayPalOrder({ amountUsd, iceyOrderNumber, description }) {
   const accessToken = await getPayPalAccessToken();
   const value = formatUsd(amountUsd);
+  const purchaseUnit = {
+    amount: {
+      currency_code: "USD",
+      value,
+    },
+  };
+  if (iceyOrderNumber) {
+    const label = String(iceyOrderNumber).slice(0, 127);
+    purchaseUnit.custom_id = label;
+    purchaseUnit.invoice_id = label;
+    purchaseUnit.description = String(description || label).slice(0, 127);
+  }
   const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
     method: "POST",
     headers: {
@@ -61,21 +73,16 @@ export async function createPayPalOrder({ amountUsd }) {
     },
     body: JSON.stringify({
       intent: "CAPTURE",
-      purchase_units: [
-        {
-          amount: {
-            currency_code: "USD",
-            value,
-          },
-        },
-      ],
+      purchase_units: [purchaseUnit],
     }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
+    const error = new Error(
       data.message || data.details?.[0]?.description || "PayPal create order failed"
     );
+    error.paypalIssue = data.details?.[0]?.issue || "";
+    throw error;
   }
   if (!data.id) throw new Error("PayPal create order failed");
   return data;

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import productService from "../appwrite/config";
 
 const STATUS_OPTIONS = ["pending", "paid", "shipped", "delivered", "cancelled"];
 
@@ -31,8 +32,23 @@ function formatAmount(val) {
   if (val == null) return "—";
   const n = Number(val);
   if (Number.isNaN(n)) return "—";
-  if (Math.abs(n) >= 100) return `$${(n / 100).toFixed(2)}`;
   return `$${n.toFixed(2)}`;
+}
+
+function readOrderMeta(order) {
+  const parsed = parseItems(order.items);
+  if (parsed && !Array.isArray(parsed)) {
+    return {
+      orderNumber: parsed.orderNumber || order.orderId || "—",
+      imageFileId: parsed.imageFileId || parsed.lines?.[0]?.imageFileId || "",
+      lines: Array.isArray(parsed.lines) ? parsed.lines : [],
+    };
+  }
+  return {
+    orderNumber: order.orderId || order.$id?.slice(0, 12) || "—",
+    imageFileId: "",
+    lines: Array.isArray(parsed) ? parsed : [],
+  };
 }
 
 function parseItems(raw) {
@@ -279,13 +295,22 @@ export default function AdminOrders() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800/50">
-                  {orders.map((order) => (
+                  {orders.map((order) => {
+                    const meta = readOrderMeta(order);
+                    const imageUrl = meta.imageFileId ? productService.getFileView(meta.imageFileId) : "";
+                    return (
                     <tr
                       key={order.$id}
                       className="hover:bg-gray-800/30 transition-colors"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-300 whitespace-nowrap">
-                        {order.orderId || order.order_id || order.$id?.slice(0, 12)}
+                      <td className="px-4 py-3 font-mono text-xs text-white whitespace-nowrap">
+                        <div className="font-semibold">{meta.orderNumber}</div>
+                        {order.paypal_order_id && (
+                          <div className="text-gray-500 mt-1">PayPal {order.paypal_order_id}</div>
+                        )}
+                        {order.paypal_capture_id && (
+                          <div className="text-gray-500">Capture {order.paypal_capture_id}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap max-w-[120px] truncate">
                         {order.userId || order.email || "—"}
@@ -324,7 +349,10 @@ export default function AdminOrders() {
                         {order.paypal_status || "—"}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
-                        {order.shipping_full_name || "—"}
+                        <div>{order.shipping_full_name || "—"}</div>
+                        <div className="text-xs text-gray-500 max-w-[240px] whitespace-normal">
+                          {order.shippingAddress || "—"}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {order.shippingphone || order.shipping_phone || order.Shippingphone || "—"}
@@ -336,28 +364,28 @@ export default function AdminOrders() {
                         {order.shipping_country || "—"}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-300">
-                        {(() => {
-                          const items = parseItems(order.items);
-                          if (!items.length) return <span className="text-gray-600">—</span>;
-                          return (
-                            <div className="space-y-1.5 min-w-[200px]">
-                              {items.map((item, idx) => (
-                                <div key={idx} className="bg-gray-800/50 rounded px-2 py-1.5 leading-relaxed">
-                                  <div className="font-medium text-gray-200 truncate max-w-[200px]">{item.name || "Unnamed"}</div>
-                                  <div className="text-gray-500 mt-0.5">
-                                    Size: {item.size || "N/A"} · Qty: {item.quantity ?? 1} · ${Number(item.price ?? 0).toFixed(2)}
-                                  </div>
+                        {imageUrl && (
+                          <img src={imageUrl} alt="" className="w-14 h-14 object-cover rounded mb-2" />
+                        )}
+                        {meta.lines.length === 0 ? <span className="text-gray-600">—</span> : (
+                          <div className="space-y-1.5 min-w-[200px]">
+                            {meta.lines.map((item, idx) => (
+                              <div key={idx} className="bg-gray-800/50 rounded px-2 py-1.5 leading-relaxed">
+                                <div className="font-medium text-gray-200 truncate max-w-[200px]">{item.name || "Unnamed"}</div>
+                                <div className="text-gray-500 mt-0.5">
+                                  Qty: {item.quantity ?? 1}
                                 </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                         {formatDate(order.$createdAt || order.orderDate)}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

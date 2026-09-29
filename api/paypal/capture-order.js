@@ -1,4 +1,5 @@
 import { capturePayPalOrder } from "../_lib/paypalServer.js";
+import { markIceyOrderPaid, logOrderRecovery } from "../_lib/iceyOrder.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,13 +13,36 @@ export default async function handler(req, res) {
     }
 
     const capture = await capturePayPalOrder(orderID);
-    const captureId =
-      capture?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null;
+    const purchase = capture?.purchase_units?.[0] || {};
+    const payment = purchase?.payments?.captures?.[0] || {};
+    const captureId = payment.id || null;
+    const paidValue = Number(payment.amount?.value);
+    const orderNumber = purchase.custom_id || "";
+
+    try {
+      await markIceyOrderPaid({
+        paypalOrderId: orderID,
+        orderNumber,
+        captureId: captureId || "",
+        amount: paidValue,
+        paidAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      logOrderRecovery("paid-save", {
+        orderNumber,
+        paypalOrderId: orderID,
+        paypalCaptureId: captureId,
+        amount: paidValue,
+        description: purchase.description || "",
+        message: err?.message || "save failed",
+      });
+    }
 
     return res.status(200).json({
       ok: true,
       orderID,
       captureId,
+      orderNumber,
       status: capture.status,
     });
   } catch (err) {

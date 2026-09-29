@@ -1,5 +1,14 @@
 import { computeCheckoutTotal } from "../_lib/computeCheckoutTotal.js";
 import { createPayPalOrder } from "../_lib/paypalServer.js";
+import { nextIceyNumber, saveIceyOrder, logOrderRecovery } from "../_lib/iceyOrder.js";
+
+function customerFrom(body) {
+  return {
+    customerName: String(body.customerName || "").trim(),
+    customerPhone: String(body.customerPhone || "").trim(),
+    shippingAddress: String(body.shippingAddress || "").trim(),
+  };
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -8,16 +17,69 @@ export default async function handler(req, res) {
 
   try {
     const body = req.body || {};
-    const items = body.items;
-    const couponCode = body.couponCode || null;
-
-    const totals = await computeCheckoutTotal({ items, couponCode });
+    const totals = await computeCheckoutTotal({
+      items: body.items,
+      couponCode: body.couponCode || null,
+    });
     if (!(totals.totalUsd > 0)) {
       return res.status(400).json({ error: "Invalid order total" });
     }
 
-    const order = await createPayPalOrder({ amountUsd: totals.totalUsd });
-    return res.status(200).json({ id: order.id });
+    let sequence = 10000 + Math.floor(Math.random() * 89999);
+    try {
+      sequence = (await nextIceyNumber()).sequence;
+    } catch (err) {
+      logOrderRecovery("number", { message: err?.message || "number failed" });
+    }
+
+    const imageFileId = totals.lineItems.find((line) => line.imageFileId)?.imageFileId || "";
+    const customer = customerFrom(body);
+    let order = null;
+    let orderNumber = "";
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      orderNumber = `ICEY-${sequence}`;
+      try {
+        order = await createPayPalOrder({
+          amountUsd: totals.totalUsd,
+          iceyOrderNumber: orderNumber,
+          description: `${orderNumber} ${imageFileId}`.trim(),
+        });
+        break;
+      } catch (err) {
+        if (err?.paypalIssue === "DUPLICATE_INVOICE_ID" && attempt < 4) {
+          sequence += 1;
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    try {
+      await saveIceyOrder({
+        orderNumber,
+        sequence,
+        imageFileId,
+        lineItems: totals.lineItems,
+        ...customer,
+        amount: totals.totalUsd,
+        orderStatus: "pending",
+        paypalStatus: "CREATED",
+        paypalOrderId: order.id,
+        paypalCaptureId: "",
+      });
+    } catch (err) {
+      logOrderRecovery("pending-save", {
+        orderNumber,
+        paypalOrderId: order.id,
+        imageFileId,
+        amount: totals.totalUsd,
+        ...customer,
+        lineItems: totals.lineItems,
+        message: err?.message || "save failed",
+      });
+    }
+
+    return res.status(200).json({ id: order.id, orderNumber });
   } catch (err) {
     console.error("[paypal/create-order]", err?.message || err);
     const msg = err?.message || "";
@@ -28,8 +90,8 @@ export default async function handler(req, res) {
     ) {
       return res.status(400).json({ error: msg });
     }
-    if (msg.includes("Missing Appwrite")) {
-      return res.status(500).json({ error: "Server configuration error" });
+    if (msg.includes("Missing Appwrite") || msg.includes("Order storage")) {
+      return res.status(500).json({ error: "Could not create PayPal order" });
     }
     return res.status(500).json({ error: "Could not create PayPal order" });
   }

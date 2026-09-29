@@ -479,19 +479,23 @@ const CheckoutPage = () => {
         it.selectedVariation?.name ?? it.selectedVariation?.title ?? null,
     }));
     const coupon = appliedCouponRef.current;
+    const fd = formDataRef.current || formData;
     return {
       items,
       couponCode: coupon?.code || null,
+      customerName: fd.fullName || "",
+      customerPhone: fd.phone || "",
+      shippingAddress: [fd.address, fd.city, fd.zipCode, fd.country].filter(Boolean).join(", "),
     };
   };
 
-  const handlePayPalPaid = async ({ orderID, captureId }) => {
+  const handlePayPalPaid = async ({ orderID, captureId, orderNumber }) => {
     const fd = formDataRef.current || formData;
     const items = cartItemsRef.current || cartItems;
     const shippingAddress = `${fd.fullName}, ${fd.address}, ${fd.city}, ${fd.zipCode}, ${fd.country} — ${fd.email} — ${fd.phone}`;
 
     setCompletedOrder({
-      orderId: captureId || orderID,
+      orderId: orderNumber || captureId || orderID,
       shippingAddress,
       items: items.map((it) => ({
         name: it.name || "Item",

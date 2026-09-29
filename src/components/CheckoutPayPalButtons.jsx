@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || "";
@@ -10,6 +10,7 @@ export default function CheckoutPayPalButtons({
   onError,
 }) {
   const [busy, setBusy] = useState(false);
+  const pendingRef = useRef(null);
 
   const options = useMemo(
     () => ({
@@ -55,6 +56,7 @@ export default function CheckoutPayPalButtons({
                 onError?.(msg);
                 throw new Error(msg);
               }
+              pendingRef.current = data.orderNumber || "";
               return data.id;
             } finally {
               setBusy(false);
@@ -77,6 +79,7 @@ export default function CheckoutPayPalButtons({
               await onPaid?.({
                 orderID: data.orderID,
                 captureId: body.captureId,
+                orderNumber: body.orderNumber || pendingRef.current || "",
               });
             } finally {
               setBusy(false);

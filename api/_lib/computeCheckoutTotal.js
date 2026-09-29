@@ -110,12 +110,14 @@ export async function computeCheckoutTotal({ items, couponCode }) {
     const unit = unitPriceFromProduct(doc, line.variationName || null);
     const lineTotal = roundMoney(unit * quantity);
     subtotal += lineTotal;
+    const images = Array.isArray(doc.images) ? doc.images : [];
     lineItems.push({
       productId,
       name: doc.name || "Item",
       quantity,
       unitPrice: unit,
       lineTotal,
+      imageFileId: images[0] ? String(images[0]) : "",
     });
   }
 
