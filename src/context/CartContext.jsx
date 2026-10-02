@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { cartLinesForServer, getLeadId } from "../lib/offerStorage";
 
 const CartContext = createContext();
 
@@ -48,6 +49,7 @@ const normalizeItem = (raw) => {
 };
 
 export const CartProvider = ({ children }) => {
+  const [addedTick, setAddedTick] = useState(0);
   const [cart, setCart] = useState(() => {
     try {
       const stored = localStorage.getItem("cart");
@@ -75,11 +77,25 @@ export const CartProvider = ({ children }) => {
     } catch {}
   }, [cart]);
 
+  useEffect(() => {
+    const leadId = getLeadId();
+    if (!leadId) return undefined;
+    const timer = setTimeout(() => {
+      fetch("/api/leads/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ leadId, items: cartLinesForServer(cart) }),
+      }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [cart]);
+
   // add or increment (normalize item before using)
   const addToCart = (rawItem) => {
     const item = normalizeItem(rawItem);
     if (!item) return;
 
+    setAddedTick((n) => n + 1);
     setCart((prev) => {
       const key = item.$id ?? item.id;
       const exists = prev.find((p) => (p.$id ?? p.id) === key);
@@ -163,6 +179,7 @@ export const CartProvider = ({ children }) => {
     <CartContext.Provider
       value={{
         cart,
+        addedTick,
         addToCart,
         updateQuantity,
         setQuantity,

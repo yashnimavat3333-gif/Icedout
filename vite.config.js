@@ -7,6 +7,12 @@ import saveAbandonedCheckout from './api/abandoned-checkout/save.js'
 import recoverAbandonedCheckout from './api/abandoned-checkout/recover.js'
 import completeAbandonedCheckout from './api/abandoned-checkout/complete.js'
 import listAdminAbandonedCheckouts from './api/admin/abandoned-checkouts.js'
+import captureLead from './api/leads/capture.js'
+import quoteLeadCart from './api/leads/quote.js'
+import syncLeadCart from './api/leads/sync.js'
+import markLeadPurchased from './api/leads/purchased.js'
+import restoreLeadCart from './api/leads/restore.js'
+import listAdminLeads from './api/admin/leads.js'
 
 function paypalApiDevPlugin() {
   const routes = {
@@ -69,6 +75,12 @@ function abandonedCheckoutApiDevPlugin() {
     '/api/abandoned-checkout/recover': recoverAbandonedCheckout,
     '/api/abandoned-checkout/complete': completeAbandonedCheckout,
     '/api/admin/abandoned-checkouts': listAdminAbandonedCheckouts,
+    '/api/leads/capture': captureLead,
+    '/api/leads/quote': quoteLeadCart,
+    '/api/leads/sync': syncLeadCart,
+    '/api/leads/purchased': markLeadPurchased,
+    '/api/leads/restore': restoreLeadCart,
+    '/api/admin/leads': listAdminLeads,
   }
 
   return {

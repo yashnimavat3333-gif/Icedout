@@ -37,6 +37,8 @@ const AdminOrders = lazy(() => import("./pages/AdminOrders.jsx"));
 const AdminReviewPanel = lazy(() => import("./pages/AdminReviews.jsx"));
 const RecoverCheckout = lazy(() => import("./pages/RecoverCheckout.jsx"));
 const AdminAbandonedCheckouts = lazy(() => import("./pages/AdminAbandonedCheckouts.jsx"));
+const AdminLeads = lazy(() => import("./pages/AdminLeads.jsx"));
+const RestoreCart = lazy(() => import("./pages/RestoreCart.jsx"));
 
 // Import AuthLayout and Login normally (they're small and used frequently)
 import { AuthLayout, Login } from "./components/index.js";
@@ -309,6 +311,22 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<RouteLoader />}>
             <AdminAbandonedCheckouts />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/admin-leads",
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <AdminLeads />
+          </Suspense>
+        ),
+      },
+      {
+        path: "/restore-cart/:token",
+        element: (
+          <Suspense fallback={<RouteLoader />}>
+            <RestoreCart />
           </Suspense>
         ),
       },

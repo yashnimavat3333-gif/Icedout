@@ -10,6 +10,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
+import { cartLinesForServer, getLeadId, getStoredCoupon, setStoredCoupon } from "../lib/offerStorage";
 
 const RECOVERY_TOKEN_KEY = "iceyout_checkout_recovery_token";
 
@@ -224,6 +225,7 @@ const CheckoutPage = () => {
 
   const [applePayError, setApplePayError] = useState("");
   const [paypalError, setPaypalError] = useState("");
+  const [serverQuote, setServerQuote] = useState(null);
 
   const formRef = useRef(null);
 
@@ -321,8 +323,74 @@ const CheckoutPage = () => {
     };
   }, [appliedCoupon, subtotalAmount]);
 
-  useEffect(() => { finalAmountRef.current = finalAmount; }, [finalAmount]);
+  const quoteMatches =
+    serverQuote && (serverQuote.couponCode || "") === (appliedCoupon?.code || "");
+  const shownSubtotal = quoteMatches ? Number(serverQuote.subtotal) : subtotalAmount;
+  const shownDiscount = quoteMatches ? Number(serverQuote.discountAmount) : discountAmount;
+  const shownTotal = quoteMatches ? Number(serverQuote.totalUsd) : finalAmount;
+  const shownPercent = quoteMatches ? Number(serverQuote.discountPercent) : discountPercent;
+
+  useEffect(() => { finalAmountRef.current = shownTotal; }, [shownTotal]);
   useEffect(() => { appliedCouponRef.current = appliedCoupon; }, [appliedCoupon]);
+
+  useEffect(() => {
+    const code = getStoredCoupon();
+    if (!code) return undefined;
+    let cancel = false;
+    (async () => {
+      const res = await validateCouponFromAppwrite(code);
+      if (cancel || !res.ok) return;
+      setAppliedCoupon((current) => current || res.coupon);
+      setCouponInput((current) => current || res.coupon.code);
+    })();
+    return () => {
+      cancel = true;
+    };
+    // Validate the stored code once when checkout opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cartQuoteKey = (cartItems || [])
+    .map((it) => `${it.$id ?? it.id}:${it.quantity || 1}:${it.selectedVariation?.name || it.selectedVariation?.title || ""}`)
+    .join("|");
+
+  useEffect(() => {
+    const items = cartLinesForServer(cartItemsRef.current || []);
+    const couponCode = appliedCoupon?.code || "";
+    if (items.length === 0) {
+      setServerQuote(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      fetch("/api/leads/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items, couponCode }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.ok) setServerQuote(data);
+        })
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cartQuoteKey, appliedCoupon]);
+
+  useEffect(() => {
+    const leadId = getLeadId();
+    const items = cartLinesForServer(cartItemsRef.current || []);
+    if (!leadId || items.length === 0) return undefined;
+    fetch("/api/leads/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leadId,
+        items,
+        checkoutStarted: true,
+      }),
+    }).catch(() => {});
+    return undefined;
+  }, [cartQuoteKey]);
 
   useEffect(() => {
     const email = (formData.email || "").trim();
@@ -355,13 +423,13 @@ const CheckoutPage = () => {
           cartItems: items,
           subtotal: subtotalAmount,
           shipping: 0,
-          discount: discountAmount,
-          total: finalAmount,
+          discount: shownDiscount,
+          total: shownTotal,
         }),
       }).catch(() => {});
     }, 2000);
     return () => clearTimeout(timer);
-  }, [formData, cartItems, subtotalAmount, discountAmount, finalAmount]);
+  }, [formData, cartItems, subtotalAmount, shownDiscount, shownTotal]);
 
   const currentStep = useMemo(() => {
     if (orderStatus?.type === "success") return 3;
@@ -439,6 +507,7 @@ const CheckoutPage = () => {
       if (!res.ok) { setCouponError(res.reason || "Invalid coupon"); setCouponLoading(false); return; }
 
       setAppliedCoupon(res.coupon);
+      setStoredCoupon(res.coupon.code);
       setCouponError("");
     } catch {
       setCouponError("Failed to apply coupon. Please try again.");
@@ -451,6 +520,7 @@ const CheckoutPage = () => {
     setAppliedCoupon(null);
     setCouponInput("");
     setCouponError("");
+    setStoredCoupon("");
   };
 
   const validateShippingFields = () => {
@@ -543,6 +613,16 @@ const CheckoutPage = () => {
     setPaypalError("");
     try {
       if (typeof clearCart === "function") clearCart();
+    } catch {}
+    try {
+      const leadId = getLeadId();
+      if (leadId && orderNumber) {
+        fetch("/api/leads/purchased", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ leadId, orderNumber }),
+        }).catch(() => {});
+      }
     } catch {}
     try {
       const recoveryToken = sessionStorage.getItem(RECOVERY_TOKEN_KEY);
@@ -804,7 +884,7 @@ const CheckoutPage = () => {
                   {appliedCoupon && !couponError && (
                     <p className="mt-1 text-xs text-green-600">
                       Coupon <span className="font-semibold">{appliedCoupon.code}</span>{" "}
-                      applied ({discountPercent}% off)
+                      applied ({shownPercent}% off)
                     </p>
                   )}
                 </div>
@@ -832,11 +912,11 @@ const CheckoutPage = () => {
 
                 <div className="flex justify-between text-gray-600">
                   <span>Subtotal</span>
-                  <span>${subtotalAmount.toFixed(2)}</span>
+                  <span>${Number(shownSubtotal || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Discount</span>
-                  <span className="text-red-600">-${discountAmount.toFixed(2)}</span>
+                  <span className="text-red-600">-${Number(shownDiscount || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Shipping</span>
@@ -844,7 +924,7 @@ const CheckoutPage = () => {
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold text-gray-800 pt-2 border-t">
                   <span>Total</span>
-                  <span>${finalAmount.toFixed(2)}</span>
+                  <span>${Number(shownTotal || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>

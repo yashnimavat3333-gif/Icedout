@@ -1,7 +1,8 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useCart } from "../context/CartContext";
 import { Trash2 } from "react-feather";
 import { Link, useNavigate } from "react-router-dom";
+import { cartLinesForServer, getStoredCoupon } from "../lib/offerStorage";
 
 const CartPage = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -11,7 +12,38 @@ const CartPage = () => {
     (sum, item) => sum + item.price * item.quantity,
     0
   );
-  console.log(cart);
+  const [quote, setQuote] = useState(null);
+  const [couponCode, setCouponCode] = useState(() => getStoredCoupon());
+
+  useEffect(() => {
+    const sync = () => setCouponCode(getStoredCoupon());
+    window.addEventListener("iceyout-coupon", sync);
+    return () => window.removeEventListener("iceyout-coupon", sync);
+  }, []);
+
+  useEffect(() => {
+    if (!couponCode || cart.length === 0) {
+      setQuote(null);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      fetch("/api/leads/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cartLinesForServer(cart),
+          couponCode,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data?.ok && data.couponCode === couponCode) setQuote(data);
+          else setQuote(null);
+        })
+        .catch(() => setQuote(null));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [cart, couponCode]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -98,9 +130,19 @@ const CartPage = () => {
 
       <div className="mt-8 flex justify-between items-center border-t pt-4">
         <div>
-          <p className="text-lg text-gray-800 font-medium">
-            Total: ${totalPrice.toLocaleString()}
-          </p>
+          {quote ? (
+            <div className="text-gray-800">
+              <p className="text-sm text-gray-500">Subtotal: ${Number(quote.subtotal).toFixed(2)}</p>
+              <p className="text-sm text-red-600">
+                {quote.couponCode} ({quote.discountPercent}%): -${Number(quote.discountAmount).toFixed(2)}
+              </p>
+              <p className="text-lg font-medium">Total: ${Number(quote.totalUsd).toFixed(2)}</p>
+            </div>
+          ) : (
+            <p className="text-lg text-gray-800 font-medium">
+              Total: ${totalPrice.toLocaleString()}
+            </p>
+          )}
         </div>
         <div className="flex gap-4">
           <button

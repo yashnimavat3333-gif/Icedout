@@ -152,6 +152,24 @@ export async function saveIceyOrder(input) {
   return databases.createDocument(databaseId, collectionId, ID.unique(), data);
 }
 
+export async function findPaidOrderByNumber(orderNumber) {
+  const wanted = String(orderNumber || "").trim();
+  if (!wanted) return null;
+  const { databases, databaseId, collectionId } = getDb();
+  const page = await databases.listDocuments(databaseId, collectionId, [
+    Query.limit(100),
+    Query.orderDesc("$createdAt"),
+  ]);
+  return (
+    (page.documents || []).find((doc) => {
+      if (doc.orderStatus !== "paid" || doc.paypal_status !== "COMPLETED") return false;
+      if (Number(doc.orderId) > 1000000) return false;
+      const stored = parseItems(doc.items);
+      return stored?.orderNumber === wanted;
+    }) || null
+  );
+}
+
 export function logOrderRecovery(reason, details) {
   console.error("[ICEY_ORDER_RECOVERY]", reason, JSON.stringify(details));
 }
