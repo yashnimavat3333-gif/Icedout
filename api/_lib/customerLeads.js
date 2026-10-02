@@ -1,6 +1,5 @@
 import { Client, Databases, ID, Query } from "node-appwrite";
 import { computeCheckoutTotal } from "./computeCheckoutTotal.js";
-import { findPaidOrderByNumber } from "./iceyOrder.js";
 
 const ABANDON_AFTER_MS = 30 * 60 * 1000;
 const OFFER_CODE = "GET10";
@@ -31,7 +30,7 @@ function getDb() {
   const projectId = process.env.APPWRITE_PROJECT_ID;
   const apiKey = process.env.APPWRITE_API_KEY;
   const databaseId = process.env.APPWRITE_DATABASE_ID;
-  const collectionId = process.env.APPWRITE_LEADS_COLLECTION_ID;
+  const collectionId = process.env.APPWRITE_LEADS_COLLECTION_ID || "customer_leads";
   if (!endpoint || !projectId || !apiKey || !databaseId || !collectionId) {
     const err = new Error("Lead storage is not configured");
     err.code = "NOT_CONFIGURED";
@@ -180,7 +179,7 @@ export async function quoteCart(items, couponCode) {
   };
 }
 
-async function findCandidates(databases, databaseId, collectionId, { leadId, email, phone }) {
+async function findCandidates(databases, databaseId, collectionId, { email, phone }) {
   const docs = [];
   const seen = new Set();
   const pull = async (attribute, value) => {
@@ -195,42 +194,17 @@ async function findCandidates(databases, databaseId, collectionId, { leadId, ema
       docs.push(doc);
     }
   };
-  await pull("leadId", leadId);
   await pull("email", email);
   await pull("phone", phone);
   return docs;
 }
 
-function leadPayload({
-  leadId,
-  email,
-  phone,
-  marketingConsent,
-  consentAt,
-  consentChannel,
-  firstCapturedAt,
-  lastActivityAt,
-  snapshot,
-  leadStatus,
-  checkoutStatus,
-  orderNumber,
-  recoveryToken,
-}) {
-  return {
-    leadId,
-    email: email || "",
-    phone: phone || "",
-    marketingConsent: Boolean(marketingConsent),
-    consentAt: consentAt || "",
-    consentChannel: consentChannel || "",
-    firstCapturedAt,
-    lastActivityAt,
-    cartData: JSON.stringify(snapshot).slice(0, 10000),
-    leadStatus,
-    checkoutStatus,
-    orderNumber: orderNumber || "",
-    recoveryToken,
-  };
+function contactRecord(email, phone, createdAt) {
+  const data = {};
+  if (email) data.email = email;
+  if (phone) data.phone = phone;
+  if (createdAt) data.createdAt = createdAt;
+  return data;
 }
 
 export async function captureLead({ contact, marketingConsent, items, leadId, applyGet10 }) {
@@ -277,74 +251,41 @@ export async function captureLead({ contact, marketingConsent, items, leadId, ap
   }
 
   const now = new Date().toISOString();
-  const consent = Boolean(marketingConsent);
   let saved = false;
   let savedLeadId = "";
-  let recoveryToken = "";
 
   try {
     const { databases, databaseId, collectionId } = getDb();
     const docs = await findCandidates(databases, databaseId, collectionId, {
-      leadId: String(leadId || ""),
       email: parsed.email,
       phone: parsed.phone,
     });
     const choice = chooseExistingLead(docs, {
-      leadId: String(leadId || ""),
+      leadId: "",
       email: parsed.email,
       phone: parsed.phone,
     });
     const existing = choice.doc;
     if (existing) {
-      const nextEmail = existing.email || parsed.email || "";
-      const nextPhone = existing.phone || parsed.phone || "";
-      const keepConsent = Boolean(existing.marketingConsent);
-      const data = leadPayload({
-        leadId: existing.leadId,
-        email: nextEmail,
-        phone: nextPhone,
-        marketingConsent: keepConsent || consent,
-        consentAt: existing.consentAt || (consent ? now : ""),
-        consentChannel: existing.consentChannel || (consent ? "discount_popup" : ""),
-        firstCapturedAt: existing.firstCapturedAt || existing.$createdAt || now,
-        lastActivityAt: now,
-        snapshot,
-        leadStatus: existing.leadStatus === "purchased" ? "purchased" : "active",
-        checkoutStatus: existing.checkoutStatus || "none",
-        orderNumber: existing.orderNumber || "",
-        recoveryToken: existing.recoveryToken || crypto.randomUUID(),
-      });
-      if (existing.leadStatus === "purchased") {
-        data.cartData = existing.cartData;
-        data.leadStatus = "purchased";
-        data.checkoutStatus = "paid";
+      const data = contactRecord(
+        existing.email ? "" : parsed.email,
+        existing.phone ? "" : parsed.phone,
+        existing.createdAt ? "" : existing.$createdAt || now
+      );
+      if (Object.keys(data).length > 0) {
+        await databases.updateDocument(databaseId, collectionId, existing.$id, data);
       }
-      await databases.updateDocument(databaseId, collectionId, existing.$id, data);
       saved = true;
-      savedLeadId = existing.leadId;
-      recoveryToken = data.recoveryToken;
+      savedLeadId = existing.$id;
     } else {
-      const newId = crypto.randomUUID();
-      const token = crypto.randomUUID();
-      const data = leadPayload({
-        leadId: newId,
-        email: parsed.email,
-        phone: parsed.phone,
-        marketingConsent: consent,
-        consentAt: consent ? now : "",
-        consentChannel: consent ? "discount_popup" : "",
-        firstCapturedAt: now,
-        lastActivityAt: now,
-        snapshot,
-        leadStatus: "new",
-        checkoutStatus: "none",
-        orderNumber: "",
-        recoveryToken: token,
-      });
-      await databases.createDocument(databaseId, collectionId, ID.unique(), data);
+      const doc = await databases.createDocument(
+        databaseId,
+        collectionId,
+        ID.unique(),
+        contactRecord(parsed.email, parsed.phone, now)
+      );
       saved = true;
-      savedLeadId = newId;
-      recoveryToken = token;
+      savedLeadId = doc.$id;
     }
   } catch (err) {
     console.error("[leads] save failed", err?.code || err?.type || "error");
@@ -354,7 +295,6 @@ export async function captureLead({ contact, marketingConsent, items, leadId, ap
   return {
     saved,
     leadId: savedLeadId,
-    recoveryToken,
     couponApplied,
     couponCode: couponApplied ? OFFER_CODE : "",
     couponMessage,
@@ -367,106 +307,16 @@ export async function captureLead({ contact, marketingConsent, items, leadId, ap
   };
 }
 
-export async function syncLead({ leadId, items, checkoutStarted }) {
-  const id = String(leadId || "").trim();
-  if (!id) {
-    const err = new Error("Missing lead");
-    err.status = 400;
-    throw err;
-  }
-  const { databases, databaseId, collectionId } = getDb();
-  const docs = await findCandidates(databases, databaseId, collectionId, {
-    leadId: id,
-    email: "",
-    phone: "",
-  });
-  const existing = docs.find((doc) => doc.leadId === id);
-  if (!existing) {
-    const err = new Error("Lead was not found");
-    err.status = 404;
-    throw err;
-  }
-  if (existing.leadStatus === "purchased") return { ok: true, purchased: true };
-
-  const stored = parseCart(existing.cartData);
-  const couponCode = stored.couponCode || "";
-  let snapshot = stored;
-  try {
-    const priced = await priceCart(items, couponCode || null);
-    snapshot = priced.snapshot;
-    if (couponCode) snapshot.couponCode = couponCode;
-  } catch {
-    snapshot = stored;
-  }
-  const now = new Date().toISOString();
-  await databases.updateDocument(databaseId, collectionId, existing.$id, {
-    lastActivityAt: now,
-    cartData: JSON.stringify(snapshot).slice(0, 10000),
-    leadStatus: "active",
-    checkoutStatus: checkoutStarted ? "checkout" : existing.checkoutStatus || "none",
-  });
+export async function syncLead() {
   return { ok: true };
 }
 
-export async function markLeadPurchased({ leadId, orderNumber }) {
-  const id = String(leadId || "").trim();
-  const number = String(orderNumber || "").trim();
-  if (!id || !number) {
-    const err = new Error("Missing lead or order");
-    err.status = 400;
-    throw err;
-  }
-  const order = await findPaidOrderByNumber(number);
-  if (!order) {
-    const err = new Error("Verified paid order was not found");
-    err.status = 409;
-    throw err;
-  }
-  const { databases, databaseId, collectionId } = getDb();
-  const docs = await findCandidates(databases, databaseId, collectionId, {
-    leadId: id,
-    email: "",
-    phone: "",
-  });
-  const existing = docs.find((doc) => doc.leadId === id);
-  if (!existing) {
-    const err = new Error("Lead was not found");
-    err.status = 404;
-    throw err;
-  }
-  const now = new Date().toISOString();
-  await databases.updateDocument(databaseId, collectionId, existing.$id, {
-    leadStatus: "purchased",
-    checkoutStatus: "paid",
-    orderNumber: number,
-    lastActivityAt: now,
-  });
-  return { ok: true, orderNumber: number };
+export async function markLeadPurchased({ orderNumber }) {
+  return { ok: true, orderNumber: String(orderNumber || "") };
 }
 
-export async function restoreLeadCart(token) {
-  const recoveryToken = String(token || "").trim();
-  if (!/^[0-9a-f-]{36}$/i.test(recoveryToken)) return null;
-  const { databases, databaseId, collectionId } = getDb();
-  const page = await databases.listDocuments(databaseId, collectionId, [
-    Query.equal("recoveryToken", recoveryToken),
-    Query.limit(1),
-  ]);
-  const doc = page.documents?.[0];
-  if (!doc) return null;
-  const cart = parseCart(doc.cartData);
-  const lines = Array.isArray(cart.lines) ? cart.lines : [];
-  return {
-    items: lines.map((line) => ({
-      productId: line.productId,
-      name: line.name,
-      quantity: line.quantity,
-      variationName: line.variationName || "",
-      unitPrice: line.unitPrice,
-      imageFileId: line.imageFileId || "",
-    })),
-    couponCode: cart.couponCode || "",
-  };
+export async function restoreLeadCart() {
+  return null;
 }
 
 export function toAdminLead(doc) {
@@ -474,13 +324,13 @@ export function toAdminLead(doc) {
   const status = displayLeadStatus(doc);
   const consent = Boolean(doc.marketingConsent);
   return {
-    leadId: doc.leadId,
+    leadId: doc.$id || "",
     email: doc.email || "",
     phone: doc.phone || "",
     marketingConsent: consent,
     consentAt: doc.consentAt || "",
     consentChannel: doc.consentChannel || "",
-    firstCapturedAt: doc.firstCapturedAt || doc.$createdAt || "",
+    firstCapturedAt: doc.createdAt || doc.$createdAt || "",
     lastActivityAt: doc.lastActivityAt || doc.$updatedAt || "",
     status,
     checkoutStatus: doc.checkoutStatus || "none",
