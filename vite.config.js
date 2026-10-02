@@ -7,12 +7,7 @@ import saveAbandonedCheckout from './api/abandoned-checkout/save.js'
 import recoverAbandonedCheckout from './api/abandoned-checkout/recover.js'
 import completeAbandonedCheckout from './api/abandoned-checkout/complete.js'
 import listAdminAbandonedCheckouts from './api/admin/abandoned-checkouts.js'
-import captureLead from './api/leads/capture.js'
-import quoteLeadCart from './api/leads/quote.js'
-import syncLeadCart from './api/leads/sync.js'
-import markLeadPurchased from './api/leads/purchased.js'
-import restoreLeadCart from './api/leads/restore.js'
-import listAdminLeads from './api/admin/leads.js'
+import leadAction from './api/leads/[action].js'
 
 function paypalApiDevPlugin() {
   const routes = {
@@ -75,12 +70,6 @@ function abandonedCheckoutApiDevPlugin() {
     '/api/abandoned-checkout/recover': recoverAbandonedCheckout,
     '/api/abandoned-checkout/complete': completeAbandonedCheckout,
     '/api/admin/abandoned-checkouts': listAdminAbandonedCheckouts,
-    '/api/leads/capture': captureLead,
-    '/api/leads/quote': quoteLeadCart,
-    '/api/leads/sync': syncLeadCart,
-    '/api/leads/purchased': markLeadPurchased,
-    '/api/leads/restore': restoreLeadCart,
-    '/api/admin/leads': listAdminLeads,
   }
 
   return {
@@ -92,7 +81,8 @@ function abandonedCheckoutApiDevPlugin() {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url || ''
         const path = url.split('?')[0]
-        const handler = routes[path]
+        const leadMatch = path.match(/^\/api\/leads\/([a-z]+)$/)
+        const handler = leadMatch ? leadAction : routes[path]
         if (!handler) return next()
 
         try {
@@ -112,7 +102,9 @@ function abandonedCheckoutApiDevPlugin() {
               res.end(JSON.stringify(data))
             },
           }
-          await handler({ method: req.method, url, body, headers: req.headers, query: Object.fromEntries(new URL(url, 'http://local').searchParams) }, mockRes)
+          const query = Object.fromEntries(new URL(url, 'http://local').searchParams)
+          if (leadMatch) query.action = leadMatch[1]
+          await handler({ method: req.method, url, body, headers: req.headers, query }, mockRes)
         } catch (err) {
           console.error('[abandoned-checkout-api-dev]', err)
           res.statusCode = 500

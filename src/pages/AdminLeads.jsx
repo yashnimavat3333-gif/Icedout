@@ -39,7 +39,7 @@ export default function AdminLeads() {
 
   const load = useCallback(async (key) => {
     setError("");
-    const res = await fetch("/api/admin/leads", {
+    const res = await fetch("/api/leads/admin", {
       headers: { Authorization: `Bearer ${key}` },
     });
     if (res.status === 401) {
