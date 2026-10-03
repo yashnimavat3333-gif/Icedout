@@ -1093,22 +1093,13 @@ const CheckoutPage = () => {
 
                 <div className="bg-gray-50 rounded-lg p-6">
                   <p className="text-sm text-gray-600 mb-2 text-center">
-                    Fill in your shipping details above, then pay securely with PayPal below.
+                    Fill in your shipping details above, then choose a payment method below.
                   </p>
                   <p className="text-xs text-gray-500 mb-4 text-center leading-relaxed">
                     Almost yours 💎 We&apos;ll save your selection so you can easily come back and complete your order.
                   </p>
-                  <CheckoutPayPalButtons
-                    buildCartPayload={buildPayPalCartPayload}
-                    validateShipping={validateShippingFields}
-                    onPaid={handlePayPalPaid}
-                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
-                  />
-                  {paypalError && (
-                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
-                  )}
 
-                  <div className="mt-6 pt-6 border-t border-gray-200">
+                  <div>
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
                         <span className="text-white text-lg font-bold"></span>
@@ -1135,6 +1126,16 @@ const CheckoutPage = () => {
                       <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
                     )}
                   </div>
+
+                  <CheckoutPayPalButtons
+                    buildCartPayload={buildPayPalCartPayload}
+                    validateShipping={validateShippingFields}
+                    onPaid={handlePayPalPaid}
+                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
+                  />
+                  {paypalError && (
+                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                  )}
                 </div>
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">
