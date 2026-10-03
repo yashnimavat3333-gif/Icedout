@@ -1118,35 +1118,27 @@ export default function ProductDetail() {
                 alert("Selected variant is out of stock.");
                 return;
               }
-              if (
-                window.confirm(
-                  "Are you sure you want to add this item to your cart?"
-                )
-              ) {
-                const cartItem = {
-                  ...product,
-                  pricing: getDisplayPricing(product, selectedVarIndex),
-                  selectedVariation: activeVariation,
-                  selectedSize: selectedSize || null,
-                };
-                
-                // Track Meta Pixel AddToCart event BEFORE adding to cart
-                try {
-                  if (typeof window.trackMetaPixelAddToCart === 'function') {
-                    const productId = product.$id || product.id || id;
-                    const productName = product.name || '';
-                    const productPrice = pricing?.price || product.price || 0;
-                    const productCategory = product.categories || product.category || '';
-                    window.trackMetaPixelAddToCart(productId, productName, productPrice, 'USD', 1, productCategory);
-                  }
-                } catch (e) {
-                  // Silently fail - do not break add to cart flow
-                  console.warn('Meta Pixel AddToCart tracking failed:', e);
+              const cartItem = {
+                ...product,
+                pricing: getDisplayPricing(product, selectedVarIndex),
+                selectedVariation: activeVariation,
+                selectedSize: selectedSize || null,
+              };
+
+              try {
+                if (typeof window.trackMetaPixelAddToCart === 'function') {
+                  const productId = product.$id || product.id || id;
+                  const productName = product.name || '';
+                  const productPrice = pricing?.price || product.price || 0;
+                  const productCategory = product.categories || product.category || '';
+                  window.trackMetaPixelAddToCart(productId, productName, productPrice, 'USD', 1, productCategory);
                 }
-                
-                addToCart(cartItem);
-                navigate("/cart");
+              } catch (e) {
+                console.warn('Meta Pixel AddToCart tracking failed:', e);
               }
+
+              addToCart(cartItem);
+              navigate("/cart");
             }}
           >
             Add to Cart
