@@ -223,7 +223,6 @@ const CheckoutPage = () => {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [userOrders, setUserOrders] = useState([]);
 
-  const [applePayError, setApplePayError] = useState("");
   const [paypalError, setPaypalError] = useState("");
   const [serverQuote, setServerQuote] = useState(null);
 
@@ -542,35 +541,6 @@ const CheckoutPage = () => {
     }
     setErrors({});
     return null;
-  };
-
-  const handleApplePayWhatsApp = () => {
-    const shippingErr = validateShippingFields();
-    if (shippingErr) {
-      setApplePayError(shippingErr);
-      return;
-    }
-
-    setApplePayError("");
-    const fd = formDataRef.current || formData;
-
-    const items = cartItemsRef.current || cartItems;
-    const productLines = items
-      .map((it) => `${it.name || "Item"} x${it.quantity || 1} — $${(Number(it.price) || 0).toFixed(2)}`)
-      .join("\n");
-    const total = (finalAmountRef.current || finalAmount || 0).toFixed(2);
-
-    const message =
-      `Hi, I want to pay with Apple Pay.\n\n` +
-      `Name: ${fd.fullName}\n` +
-      `Email: ${fd.email}\n` +
-      `Phone: ${fd.phone}\n` +
-      `Address: ${fd.address}, ${fd.city}, ${fd.zipCode}, ${fd.country}\n\n` +
-      `Products:\n${productLines}\n\n` +
-      `Total: $${total}`;
-
-    const url = `https://wa.me/+918850840154?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
   };
 
   const buildPayPalCartPayload = () => {
@@ -947,7 +917,7 @@ const CheckoutPage = () => {
                 Shipping Information
               </h2>
               <p className="text-sm text-gray-500 mb-6">
-                Fill in your details below to proceed with Apple Pay checkout.
+                Fill in your details below to proceed with PayPal checkout.
               </p>
 
               <div className="space-y-4 mb-8">
@@ -1093,39 +1063,11 @@ const CheckoutPage = () => {
 
                 <div className="bg-gray-50 rounded-lg p-6">
                   <p className="text-sm text-gray-600 mb-2 text-center">
-                    Fill in your shipping details above, then choose a payment method below.
+                    Fill in your shipping details above, then pay securely with PayPal below.
                   </p>
                   <p className="text-xs text-gray-500 mb-4 text-center leading-relaxed">
                     Almost yours 💎 We&apos;ll save your selection so you can easily come back and complete your order.
                   </p>
-
-                  <div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                        <span className="text-white text-lg font-bold"></span>
-                      </div>
-                      <div>
-                        <p className="text-base font-semibold text-gray-800">
-                          Pay with Apple Pay
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Fill in your shipping details above, then tap below to receive a secure Apple Pay link via WhatsApp.
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={handleApplePayWhatsApp}
-                      className="w-full mt-3 px-5 py-3.5 bg-black hover:bg-gray-900 text-white text-base font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center gap-2"
-                    >
-                      Pay with Apple Pay
-                    </button>
-
-                    {applePayError && (
-                      <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
-                    )}
-                  </div>
 
                   <CheckoutPayPalButtons
                     buildCartPayload={buildPayPalCartPayload}

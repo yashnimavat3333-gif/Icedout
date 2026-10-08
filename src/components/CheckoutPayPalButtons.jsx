@@ -31,7 +31,7 @@ export default function CheckoutPayPalButtons({
 
   return (
     <PayPalScriptProvider options={options}>
-      <div className="mt-6 border-t pt-6">
+      <div className="mt-2">
         <p className="text-base font-semibold text-gray-800 mb-3">Pay with PayPal</p>
         <PayPalButtons
           style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal" }}
