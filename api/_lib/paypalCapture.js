@@ -146,6 +146,160 @@ export function paymentDecision(existing, facts) {
   return { action: "markPaid" };
 }
 
+export const MISSING_PAYMENT_ORDER_NUMBER = "ICEY-989107";
+export const MISSING_PAYMENT_SEQUENCE = 989107;
+export const MISSING_PAYMENT_AMOUNT = 595.57;
+export const PROTECTED_ORDER_ID = 989106;
+export const MISSING_PAYMENT_FOLLOW_UP =
+  "Product name, variant, and quantity were not included in the verified PayPal payment. Confirm the item before fulfilment.";
+
+export function assessMissingPayment(paypalOrder, suppliedCaptureId = "") {
+  if (!paypalOrder || typeof paypalOrder !== "object" || !String(paypalOrder.id || "").trim()) {
+    return { action: "invalid" };
+  }
+  const purchase = paypalOrder.purchase_units?.[0] || {};
+  const captures = Array.isArray(purchase.payments?.captures) ? purchase.payments.captures : [];
+  const wanted = String(suppliedCaptureId || "").trim();
+  const capture = wanted
+    ? captures.find((item) => item?.id === wanted)
+    : captures.find((item) => item?.status === "COMPLETED") || captures[0];
+  if (!capture?.id) return { action: "invalid" };
+  if (capture.status !== "COMPLETED" || String(paypalOrder.status || "") !== "COMPLETED") {
+    return { action: "unpaid" };
+  }
+
+  const orderNumber = [purchase.custom_id, purchase.invoice_id]
+    .map((value) => String(value || "").trim())
+    .find((value) => value.toUpperCase() === MISSING_PAYMENT_ORDER_NUMBER);
+  if (!orderNumber) return { action: "invalid" };
+
+  const amount = Number(capture.amount?.value);
+  const currency = String(capture.amount?.currency_code || "");
+  if (currency !== "USD" || !Number.isFinite(amount)) return { action: "invalid" };
+  if (Math.abs(amount - MISSING_PAYMENT_AMOUNT) > 0.001) return { action: "wrong-amount" };
+
+  return {
+    action: "verified",
+    facts: {
+      orderNumber: MISSING_PAYMENT_ORDER_NUMBER,
+      sequence: MISSING_PAYMENT_SEQUENCE,
+      imageFileId: imageFileIdFromDescription(purchase.description, MISSING_PAYMENT_ORDER_NUMBER),
+      paypalOrderId: String(paypalOrder.id).trim(),
+      captureId: String(capture.id),
+      amount: MISSING_PAYMENT_AMOUNT,
+      customerName: paypalName(paypalOrder, purchase),
+      customerPhone: paypalPhone(paypalOrder, purchase),
+      shippingAddress: paypalAddress(purchase),
+      lineItems: [],
+    },
+  };
+}
+
+function paypalPhone(paypalOrder, purchase) {
+  const raw =
+    purchase?.shipping?.phone_number?.national_number ||
+    paypalOrder?.payer?.phone?.phone_number?.national_number ||
+    "";
+  const digits = String(raw).replace(/\D/g, "");
+  if (digits.length < 8 || digits.length > 15) return "";
+  return digits;
+}
+
+export function missingPaymentDecision(documents, facts) {
+  if (!facts || facts.orderNumber !== MISSING_PAYMENT_ORDER_NUMBER) return { action: "invalid" };
+  if (Math.abs(Number(facts.amount) - MISSING_PAYMENT_AMOUNT) > 0.001) return { action: "wrong-amount" };
+  const existing = (documents || []).find((doc) => {
+    if (!doc || Number(doc.orderId) === PROTECTED_ORDER_ID) return false;
+    if (Number(doc.orderId) > HISTORICAL_ORDER_ID) return false;
+    if (facts.captureId && doc.paypal_capture_id === facts.captureId) return true;
+    if (facts.paypalOrderId && doc.paypal_order_id === facts.paypalOrderId) return true;
+    return Number(doc.orderId) === MISSING_PAYMENT_SEQUENCE || storedOrderNumber(doc) === MISSING_PAYMENT_ORDER_NUMBER;
+  });
+  if (!existing) return { action: "create" };
+  if (Number(existing.orderId) !== MISSING_PAYMENT_SEQUENCE) return { action: "invalid" };
+  return { action: "duplicate", existing };
+}
+
+export function buildMissingPaymentRecord(facts, paidAt) {
+  const when = paidAt || new Date().toISOString();
+  const shippingAddress = String(facts?.shippingAddress || "").trim();
+  return {
+    orderId: MISSING_PAYMENT_SEQUENCE,
+    orderDate: when,
+    billingAddress: shippingAddress || "Not provided by PayPal",
+    shippingAddress,
+    shippingphone: facts?.customerPhone || "",
+    shipping_full_name: facts?.customerName || "",
+    amount: MISSING_PAYMENT_AMOUNT,
+    totalAmount: MISSING_PAYMENT_AMOUNT,
+    currency: "USD",
+    orderStatus: "paid",
+    payment_method: "paypal",
+    paypal_status: "COMPLETED",
+    paypal_order_id: facts.paypalOrderId,
+    paypal_capture_id: facts.captureId,
+    customerId: MISSING_PAYMENT_SEQUENCE,
+    items: JSON.stringify({
+      orderNumber: MISSING_PAYMENT_ORDER_NUMBER,
+      imageFileId: facts.imageFileId || "",
+      lines: [],
+      followUp: MISSING_PAYMENT_FOLLOW_UP,
+    }),
+  };
+}
+
+export function applyMissingPaymentRecovery({ documents, paypalOrder, captureId, paidAt }) {
+  const protectedDocs = (documents || []).filter((doc) => Number(doc.orderId) === PROTECTED_ORDER_ID);
+  const before = protectedDocs.map((doc) => JSON.stringify(doc));
+  const assessment = assessMissingPayment(paypalOrder, captureId);
+  if (assessment.action !== "verified") {
+    return { action: assessment.action, documents: documents || [] };
+  }
+  const decision = missingPaymentDecision(documents, assessment.facts);
+  if (decision.action !== "create") {
+    return { action: decision.action, documents: documents || [], order: decision.existing || null };
+  }
+  const record = buildMissingPaymentRecord(assessment.facts, paidAt);
+  const after = (documents || [])
+    .filter((doc) => Number(doc.orderId) === PROTECTED_ORDER_ID)
+    .map((doc) => JSON.stringify(doc));
+  if (before.join() !== after.join()) return { action: "invalid", documents: documents || [] };
+  return {
+    action: "created",
+    record,
+    documents: [...(documents || []), { $id: "recovered", ...record }],
+  };
+}
+
+export async function loadVerifiedMissingPayment({ paypalId, getOrder, getCapture }) {
+  const id = String(paypalId || "").trim();
+  if (!/^[A-Za-z0-9]{10,36}$/.test(id)) return { action: "invalid" };
+
+  try {
+    const order = await getOrder(id);
+    if (order?.id) return assessMissingPayment(order);
+  } catch {
+    // The value may be a capture id rather than a PayPal order id.
+  }
+
+  let capture;
+  try {
+    capture = await getCapture(id);
+  } catch {
+    return { action: "invalid" };
+  }
+  if (!capture?.id || String(capture.id) !== id) return { action: "invalid" };
+  if (capture.status !== "COMPLETED") return { action: "unpaid" };
+  const relatedOrderId = String(capture.supplementary_data?.related_ids?.order_id || "").trim();
+  if (!relatedOrderId) return { action: "invalid" };
+  try {
+    const order = await getOrder(relatedOrderId);
+    return assessMissingPayment(order, id);
+  } catch {
+    return { action: "invalid" };
+  }
+}
+
 export async function loadCompletedCapture({ orderId, captureOrder, getOrder }) {
   try {
     return { order: await captureOrder(orderId), alreadyCaptured: false };

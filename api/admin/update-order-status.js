@@ -1,6 +1,13 @@
-import { Client, Databases } from "node-appwrite";
-import { getPayPalOrder } from "../_lib/paypalServer.js";
-import { factsFromVerifiedOrder, paymentDecision, recoveryEligibility } from "../_lib/paypalCapture.js";
+import { Client, Databases, ID, Query } from "node-appwrite";
+import { getPayPalCapture, getPayPalOrder } from "../_lib/paypalServer.js";
+import {
+  buildMissingPaymentRecord,
+  factsFromVerifiedOrder,
+  loadVerifiedMissingPayment,
+  missingPaymentDecision,
+  paymentDecision,
+  recoveryEligibility,
+} from "../_lib/paypalCapture.js";
 import { logOrderRecovery } from "../_lib/iceyOrder.js";
 
 let client = null;
@@ -56,6 +63,67 @@ export default async function handler(req, res) {
   }
 
   const { documentId, status, action } = req.body || {};
+
+  if (action === "recover-missing") {
+    const paypalId = String(req.body?.paypalId || req.body?.paypalOrderId || req.body?.captureId || "").trim();
+    try {
+      const verified = await loadVerifiedMissingPayment({
+        paypalId,
+        getOrder: getPayPalOrder,
+        getCapture: getPayPalCapture,
+      });
+      if (verified.action !== "verified") {
+        const errors = {
+          unpaid: "PayPal has not completed this payment",
+          "wrong-amount": "PayPal amount does not match $595.57",
+          invalid: "Enter the PayPal order ID or capture ID for ICEY-989107",
+        };
+        return res.status(400).json({ error: errors[verified.action] || errors.invalid });
+      }
+      const { databases: db } = getClient();
+      const found = [];
+      for (const [field, value] of [
+        ["paypal_capture_id", verified.facts.captureId],
+        ["paypal_order_id", verified.facts.paypalOrderId],
+      ]) {
+        try {
+          const page = await db.listDocuments(databaseId, collectionId, [
+            Query.equal(field, value),
+            Query.limit(5),
+          ]);
+          found.push(...(page.documents || []));
+        } catch {
+          // The collection may not have this index. The recent-order scan still runs.
+        }
+      }
+      const recent = await db.listDocuments(databaseId, collectionId, [
+        Query.limit(100),
+        Query.orderDesc("$createdAt"),
+      ]);
+      const decision = missingPaymentDecision(
+        [...found, ...(recent.documents || [])],
+        verified.facts
+      );
+      if (decision.action === "duplicate") {
+        return res.status(200).json({ success: true, action: "duplicate", order: decision.existing });
+      }
+      if (decision.action !== "create") {
+        return res.status(400).json({ error: "This payment cannot be recorded" });
+      }
+      const order = await db.createDocument(
+        databaseId,
+        collectionId,
+        ID.unique(),
+        buildMissingPaymentRecord(verified.facts)
+      );
+      return res.status(200).json({ success: true, action: "created", order });
+    } catch (error) {
+      logOrderRecovery("missing-payment", {
+        message: error?.message || "PayPal check failed",
+      });
+      return res.status(502).json({ error: "PayPal could not be checked" });
+    }
+  }
 
   if (action === "reconcile") {
     if (!documentId || typeof documentId !== "string") {

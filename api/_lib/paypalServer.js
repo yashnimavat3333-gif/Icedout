@@ -108,6 +108,23 @@ export async function getPayPalOrder(orderId) {
   return data;
 }
 
+export async function getPayPalCapture(captureId) {
+  const accessToken = await getPayPalAccessToken();
+  const id = String(captureId || "").trim();
+  if (!id) throw new Error("Missing PayPal capture id");
+  const res = await fetch(`${PAYPAL_API}/v2/payments/captures/${encodeURIComponent(id)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || "PayPal capture lookup failed");
+  }
+  return data;
+}
+
 export async function capturePayPalOrder(orderId) {
   const accessToken = await getPayPalAccessToken();
   const id = String(orderId || "").trim();

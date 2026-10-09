@@ -42,12 +42,14 @@ function readOrderMeta(order) {
       orderNumber: parsed.orderNumber || order.orderId || "—",
       imageFileId: parsed.imageFileId || parsed.lines?.[0]?.imageFileId || "",
       lines: Array.isArray(parsed.lines) ? parsed.lines : [],
+      followUp: typeof parsed.followUp === "string" ? parsed.followUp : "",
     };
   }
   return {
     orderNumber: order.orderId || order.$id?.slice(0, 12) || "—",
     imageFileId: "",
     lines: Array.isArray(parsed) ? parsed : [],
+    followUp: "",
   };
 }
 
@@ -73,6 +75,8 @@ export default function AdminOrders() {
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [updatingId, setUpdatingId] = useState(null);
+  const [paypalId, setPaypalId] = useState("");
+  const [recovering, setRecovering] = useState(false);
 
   const fetchOrders = useCallback(async (key) => {
     setLoading(true);
@@ -197,6 +201,45 @@ export default function AdminOrders() {
     }
   };
 
+  const handleRecoverMissing = async (event) => {
+    event.preventDefault();
+    setRecovering(true);
+    setError(null);
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/admin/update-order-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({ action: "recover-missing", paypalId: paypalId.trim() }),
+      });
+      if (res.status === 401) {
+        setAuthenticated(false);
+        sessionStorage.removeItem("admin_key");
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (data.order) {
+        setOrders((prev) => [data.order, ...prev.filter((order) => order.$id !== data.order.$id)]);
+      }
+      if (data.action === "created") setTotal((count) => count + 1);
+      setSuccessMsg(
+        data.action === "duplicate"
+          ? "ICEY-989107 is already recorded."
+          : "ICEY-989107 was recorded from the verified PayPal payment."
+      );
+      setPaypalId("");
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      setError(err.message || "Failed to recover the payment");
+    } finally {
+      setRecovering(false);
+    }
+  };
+
   const handleLogout = () => {
     sessionStorage.removeItem("admin_key");
     setAdminKey("");
@@ -276,6 +319,28 @@ export default function AdminOrders() {
           </div>
         </div>
       </div>
+
+      <form
+        onSubmit={handleRecoverMissing}
+        className="max-w-[1600px] mx-auto px-4 sm:px-6 pt-4 flex flex-col sm:flex-row gap-3 sm:items-end"
+      >
+        <label className="flex-1 text-sm text-gray-400">
+          Recover ICEY-989107 ($595.57)
+          <input
+            value={paypalId}
+            onChange={(event) => setPaypalId(event.target.value)}
+            placeholder="PayPal order ID or capture ID"
+            className="mt-1 w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={recovering || !paypalId.trim()}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-sm font-medium disabled:opacity-50"
+        >
+          {recovering ? "Checking PayPal…" : "Recover payment"}
+        </button>
+      </form>
 
       {/* Toast messages */}
       {successMsg && (
@@ -418,6 +483,9 @@ export default function AdminOrders() {
                       <td className="px-4 py-3 text-xs text-gray-300">
                         {imageUrl && (
                           <img src={imageUrl} alt="" className="w-14 h-14 object-cover rounded mb-2" />
+                        )}
+                        {meta.followUp && (
+                          <div className="text-amber-300 mb-2 max-w-[240px] whitespace-normal">{meta.followUp}</div>
                         )}
                         {meta.lines.length === 0 ? <span className="text-gray-600">—</span> : (
                           <div className="space-y-1.5 min-w-[200px]">
