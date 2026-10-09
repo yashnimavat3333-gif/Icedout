@@ -220,6 +220,24 @@ export function missingPaymentDecision(documents, facts) {
   return { action: "duplicate", existing };
 }
 
+export function publicRecoveryError(error) {
+  const status = Number(error?.code || error?.status || 0);
+  const type = String(error?.type || error?.paypalIssue || "")
+    .replace(/[^A-Za-z0-9._-]/g, "")
+    .slice(0, 48);
+  let message = String(error?.message || "request failed");
+  message = message
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/https?:\/\/\S+/gi, "[redacted]")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted]")
+    .replace(/[A-Za-z0-9+/]{32,}={0,2}/g, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 160);
+  const prefix = status ? `PayPal recovery failed (${status})` : "PayPal recovery failed";
+  return [prefix, [type, message].filter(Boolean).join(": ")].filter(Boolean).join(": ").slice(0, 220);
+}
+
 export function buildMissingPaymentRecord(facts, paidAt) {
   const when = paidAt || new Date().toISOString();
   const shippingAddress = String(facts?.shippingAddress || "").trim();
@@ -228,9 +246,9 @@ export function buildMissingPaymentRecord(facts, paidAt) {
     orderDate: when,
     billingAddress: shippingAddress || "Not provided by PayPal",
     shippingAddress,
-    shippingphone: facts?.customerPhone || "",
+    shippingphone: facts?.customerPhone || "Not provided by PayPal",
     shipping_full_name: facts?.customerName || "",
-    amount: MISSING_PAYMENT_AMOUNT,
+    amount: Math.trunc(MISSING_PAYMENT_AMOUNT),
     totalAmount: MISSING_PAYMENT_AMOUNT,
     currency: "USD",
     orderStatus: "paid",

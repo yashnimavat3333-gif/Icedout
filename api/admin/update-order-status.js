@@ -2,6 +2,7 @@ import { Client, Databases, ID, Query } from "node-appwrite";
 import { getPayPalCapture, getPayPalOrder } from "../_lib/paypalServer.js";
 import {
   buildMissingPaymentRecord,
+  publicRecoveryError,
   factsFromVerifiedOrder,
   loadVerifiedMissingPayment,
   missingPaymentDecision,
@@ -118,10 +119,9 @@ export default async function handler(req, res) {
       );
       return res.status(200).json({ success: true, action: "created", order });
     } catch (error) {
-      logOrderRecovery("missing-payment", {
-        message: error?.message || "PayPal check failed",
-      });
-      return res.status(502).json({ error: "PayPal could not be checked" });
+      const safe = publicRecoveryError(error);
+      logOrderRecovery("missing-payment", { message: safe });
+      return res.status(502).json({ error: safe });
     }
   }
 

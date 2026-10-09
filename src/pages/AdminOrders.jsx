@@ -421,7 +421,11 @@ export default function AdminOrders() {
                         {order.userId || order.email || "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-white whitespace-nowrap">
-                        {formatAmount(order.amount ?? order.totalAmount)}
+                        {formatAmount(
+                          Number(order.orderId) === 989107 && order.totalAmount != null
+                            ? order.totalAmount
+                            : order.amount ?? order.totalAmount
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {order.currency || "USD"}

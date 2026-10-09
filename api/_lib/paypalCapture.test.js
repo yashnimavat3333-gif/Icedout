@@ -7,6 +7,7 @@ import {
   loadVerifiedMissingPayment,
   matchIceyDocument,
   paymentDecision,
+  publicRecoveryError,
   recoveryEligibility,
 } from "./paypalCapture.js";
 import { persistVerifiedCapture, shouldPreservePaidOrder } from "./iceyOrder.js";
@@ -297,7 +298,10 @@ test("missing payment recovery creates one ICEY-989107 record and a retry does n
   assert.equal(JSON.stringify(first.documents[0]), JSON.stringify(neighbour));
   const saved = JSON.parse(first.record.items);
   assert.equal(first.record.orderId, 989107);
-  assert.equal(first.record.amount, 595.57);
+  assert.equal(first.record.amount, 595);
+  assert.equal(Number.isInteger(first.record.amount), true);
+  assert.equal(first.record.totalAmount, 595.57);
+  assert.equal(first.record.shippingphone, "Not provided by PayPal");
   assert.equal(first.record.orderStatus, "paid");
   assert.equal(first.record.paypal_status, "COMPLETED");
   assert.equal(first.record.shipping_full_name, "Ava Stone");
@@ -314,6 +318,36 @@ test("missing payment recovery creates one ICEY-989107 record and a retry does n
   assert.equal(second.action, "duplicate");
   assert.equal(second.documents.length, 2);
   assert.equal(JSON.stringify(second.documents[0]), JSON.stringify(neighbour));
+});
+
+test("a failed save reports a sanitized reason and does not mark the payment recovered", () => {
+  const neighbour = {
+    $id: "neighbour",
+    orderId: 989106,
+    orderStatus: "paid",
+    amount: 892,
+    totalAmount: 892.5,
+  };
+  const thrown = new Error(
+    'Invalid document structure: Attribute "amount" has invalid type. Bearer secret-token customer@example.com'
+  );
+  thrown.code = 400;
+  thrown.type = "document_invalid_structure";
+  const safe = publicRecoveryError(thrown);
+  assert.match(safe, /400/);
+  assert.match(safe, /document_invalid_structure/);
+  assert.match(safe, /amount/);
+  assert.equal(safe.includes("secret-token"), false);
+  assert.equal(safe.includes("customer@example.com"), false);
+  assert.equal(safe.includes("Bearer secret"), false);
+
+  const rejected = applyMissingPaymentRecovery({
+    documents: [neighbour],
+    paypalOrder: { id: "PAYPAL989107", status: "APPROVED", purchase_units: [] },
+  });
+  assert.notEqual(rejected.action, "created");
+  assert.equal(rejected.documents.length, 1);
+  assert.equal(JSON.stringify(rejected.documents[0]), JSON.stringify(neighbour));
 });
 
 test("a capture id is accepted only when the related PayPal order matches ICEY-989107", async () => {
