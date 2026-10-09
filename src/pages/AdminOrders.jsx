@@ -52,13 +52,12 @@ function readOrderMeta(order) {
 }
 
 function parseItems(raw) {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return JSON.parse(raw);
   } catch {
-    return [];
+    return null;
   }
 }
 
@@ -152,6 +151,47 @@ export default function AdminOrders() {
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
       setError(err.message || "Failed to update status");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleReconcile = async (documentId) => {
+    setUpdatingId(documentId);
+    setError(null);
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/admin/update-order-status", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${adminKey}`,
+        },
+        body: JSON.stringify({ documentId, action: "reconcile" }),
+      });
+
+      if (res.status === 401) {
+        setAuthenticated(false);
+        sessionStorage.removeItem("admin_key");
+        return;
+      }
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+      if (data.action === "updated" && data.order) {
+        setOrders((prev) => prev.map((order) => (order.$id === documentId ? data.order : order)));
+        setSuccessMsg("PayPal confirmed this payment. The order is now paid.");
+      } else if (data.action === "duplicate") {
+        setSuccessMsg("PayPal already confirmed this payment.");
+      } else if (data.action === "unpaid") {
+        setError("PayPal has not completed this payment.");
+      } else {
+        setError("PayPal’s payment does not match this order.");
+      }
+      setTimeout(() => setSuccessMsg(""), 4000);
+    } catch (err) {
+      setError(err.message || "Failed to check PayPal");
     } finally {
       setUpdatingId(null);
     }
@@ -346,7 +386,19 @@ export default function AdminOrders() {
                         {order.payment_method || "paypal"}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                        {order.paypal_status || "—"}
+                        <div>{order.paypal_status || "—"}</div>
+                        {order.orderStatus === "pending" &&
+                          order.paypal_order_id &&
+                          Number(order.orderId) <= 1000000 && (
+                          <button
+                            type="button"
+                            onClick={() => handleReconcile(order.$id)}
+                            disabled={updatingId === order.$id}
+                            className="mt-2 text-indigo-300 underline disabled:opacity-50"
+                          >
+                            Check PayPal
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-300 whitespace-nowrap">
                         <div>{order.shipping_full_name || "—"}</div>

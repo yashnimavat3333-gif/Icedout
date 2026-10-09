@@ -1,4 +1,5 @@
 import { Client, Databases, ID, Query } from "node-appwrite";
+import { factsFromVerifiedOrder, matchIceyDocument, paymentDecision } from "./paypalCapture.js";
 
 function getDb() {
   const endpoint = process.env.APPWRITE_ENDPOINT;
@@ -133,6 +134,15 @@ export async function markIceyOrderPaid({
   return existing;
 }
 
+export function shouldPreservePaidOrder(existing) {
+  return Boolean(
+    existing &&
+      Number(existing.orderId) <= 1000000 &&
+      existing.orderStatus === "paid" &&
+      existing.paypal_status === "COMPLETED"
+  );
+}
+
 export async function saveIceyOrder(input) {
   const { databases, databaseId, collectionId } = getDb();
   const sequence = Number(String(input.orderNumber || "").replace(/^ICEY-/i, ""));
@@ -146,10 +156,94 @@ export async function saveIceyOrder(input) {
   );
   if (existing) {
     if (Number(existing.orderId) > 1000000) return existing;
+    if (shouldPreservePaidOrder(existing)) return existing;
     await databases.updateDocument(databaseId, collectionId, existing.$id, data);
     return existing;
   }
   return databases.createDocument(databaseId, collectionId, ID.unique(), data);
+}
+
+async function findByPayPalField(databases, databaseId, collectionId, field, value, facts) {
+  if (!value) return null;
+  try {
+    const page = await databases.listDocuments(databaseId, collectionId, [
+      Query.equal(field, value),
+      Query.limit(5),
+    ]);
+    return matchIceyDocument(page.documents, facts);
+  } catch {
+    return null;
+  }
+}
+
+export async function persistVerifiedCapture(db, facts, paidAt) {
+  const { databases, databaseId, collectionId } = db;
+  const byCapture = await findByPayPalField(
+    databases,
+    databaseId,
+    collectionId,
+    "paypal_capture_id",
+    facts.captureId,
+    facts
+  );
+  const byOrder =
+    byCapture ||
+    (await findByPayPalField(
+      databases,
+      databaseId,
+      collectionId,
+      "paypal_order_id",
+      facts.paypalOrderId,
+      facts
+    ));
+  let existing = byOrder;
+  if (!existing) {
+    const page = await databases.listDocuments(databaseId, collectionId, [
+      Query.limit(100),
+      Query.orderDesc("$createdAt"),
+    ]);
+    existing = matchIceyDocument(page.documents, facts);
+  }
+
+  const decision = paymentDecision(existing, facts);
+  if (decision.action !== "markPaid") {
+    return { action: decision.action, orderNumber: facts.orderNumber };
+  }
+
+  const when = paidAt || new Date().toISOString();
+  await databases.updateDocument(databaseId, collectionId, existing.$id, {
+    orderStatus: "paid",
+    paypal_status: "COMPLETED",
+    paypal_order_id: facts.paypalOrderId || existing.paypal_order_id || "",
+    paypal_capture_id: facts.captureId || "",
+    amount: facts.amount,
+    totalAmount: facts.amount,
+    orderDate: when,
+  });
+  return { action: "updated", orderNumber: facts.orderNumber };
+}
+
+export async function applyVerifiedPayPalPayment(paypalOrder, options = {}) {
+  const facts = factsFromVerifiedOrder(paypalOrder, options.captureId || "");
+  if (!facts) {
+    logOrderRecovery("capture-unusable", {
+      paypalOrderId: paypalOrder?.id || "",
+      message: "Verified PayPal order did not include an ICEY reference and completed USD capture",
+    });
+    return { action: "ignore" };
+  }
+  try {
+    return await persistVerifiedCapture(getDb(), facts, options.paidAt);
+  } catch (err) {
+    logOrderRecovery("paid-save", {
+      orderNumber: facts.orderNumber,
+      paypalOrderId: facts.paypalOrderId,
+      paypalCaptureId: facts.captureId,
+      amount: facts.amount,
+      message: err?.message || "save failed",
+    });
+    throw err;
+  }
 }
 
 export async function findPaidOrderByNumber(orderNumber) {

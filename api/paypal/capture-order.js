@@ -1,5 +1,6 @@
-import { capturePayPalOrder } from "../_lib/paypalServer.js";
-import { markIceyOrderPaid, logOrderRecovery } from "../_lib/iceyOrder.js";
+import { capturePayPalOrder, getPayPalOrder } from "../_lib/paypalServer.js";
+import { applyVerifiedPayPalPayment, logOrderRecovery } from "../_lib/iceyOrder.js";
+import { loadCompletedCapture } from "../_lib/paypalCapture.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -12,28 +13,32 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing orderID" });
     }
 
-    const capture = await capturePayPalOrder(orderID);
+    const completed = await loadCompletedCapture({
+      orderId: orderID,
+      captureOrder: capturePayPalOrder,
+      getOrder: getPayPalOrder,
+    });
+    if (completed.lookupFailed || !completed.order) {
+      logOrderRecovery("capture-lookup", {
+        paypalOrderId: orderID,
+        message: "PayPal already captured this order. The capture details could not be reloaded.",
+      });
+      return res.status(200).json({ ok: true, orderID, status: "COMPLETED" });
+    }
+    const capture = completed.order;
     const purchase = capture?.purchase_units?.[0] || {};
     const payment = purchase?.payments?.captures?.[0] || {};
     const captureId = payment.id || null;
-    const paidValue = Number(payment.amount?.value);
     const orderNumber = purchase.custom_id || "";
 
     try {
-      await markIceyOrderPaid({
-        paypalOrderId: orderID,
-        orderNumber,
-        captureId: captureId || "",
-        amount: paidValue,
-        paidAt: new Date().toISOString(),
-      });
+      await applyVerifiedPayPalPayment(capture, { captureId: captureId || "" });
     } catch (err) {
       logOrderRecovery("paid-save", {
         orderNumber,
         paypalOrderId: orderID,
         paypalCaptureId: captureId,
-        amount: paidValue,
-        description: purchase.description || "",
+        amount: Number(payment.amount?.value),
         message: err?.message || "save failed",
       });
     }

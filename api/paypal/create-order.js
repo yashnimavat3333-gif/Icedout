@@ -38,11 +38,32 @@ export default async function handler(req, res) {
     let orderNumber = "";
     for (let attempt = 0; attempt < 5; attempt += 1) {
       orderNumber = `ICEY-${sequence}`;
+      const pendingOrder = {
+        orderNumber,
+        sequence,
+        imageFileId,
+        lineItems: totals.lineItems,
+        ...customer,
+        amount: totals.totalUsd,
+        orderStatus: "pending",
+        paypalStatus: "CREATED",
+        paypalOrderId: "",
+        paypalCaptureId: "",
+      };
+      try {
+        await saveIceyOrder(pendingOrder);
+      } catch (err) {
+        logOrderRecovery("pending-save", {
+          orderNumber,
+          amount: totals.totalUsd,
+          message: err?.message || "save failed",
+        });
+        return res.status(500).json({ error: "Could not create PayPal order" });
+      }
       try {
         order = await createPayPalOrder({
           amountUsd: totals.totalUsd,
           iceyOrderNumber: orderNumber,
-          description: `${orderNumber} ${imageFileId}`.trim(),
         });
         break;
       } catch (err) {
@@ -68,13 +89,10 @@ export default async function handler(req, res) {
         paypalCaptureId: "",
       });
     } catch (err) {
-      logOrderRecovery("pending-save", {
+      logOrderRecovery("pending-paypal-id", {
         orderNumber,
         paypalOrderId: order.id,
-        imageFileId,
         amount: totals.totalUsd,
-        ...customer,
-        lineItems: totals.lineItems,
         message: err?.message || "save failed",
       });
     }

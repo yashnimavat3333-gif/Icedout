@@ -50,31 +50,34 @@ function roundMoney(n) {
   return Math.round(Number(n) * 100) / 100;
 }
 
-export async function createPayPalOrder({ amountUsd, iceyOrderNumber, description }) {
-  const accessToken = await getPayPalAccessToken();
-  const value = formatUsd(amountUsd);
-  const purchaseUnit = {
-    amount: {
-      currency_code: "USD",
-      value,
-    },
+export function buildPayPalOrderBody({ amountUsd, iceyOrderNumber }) {
+  const label = String(iceyOrderNumber || "").trim().slice(0, 127);
+  if (!/^ICEY-\d+$/i.test(label)) throw new Error("Missing ICEY order reference");
+  return {
+    intent: "CAPTURE",
+    purchase_units: [
+      {
+        amount: {
+          currency_code: "USD",
+          value: formatUsd(amountUsd),
+        },
+        custom_id: label,
+        invoice_id: label,
+        description: "ICEYOUT order",
+      },
+    ],
   };
-  if (iceyOrderNumber) {
-    const label = String(iceyOrderNumber).slice(0, 127);
-    purchaseUnit.custom_id = label;
-    purchaseUnit.invoice_id = label;
-    purchaseUnit.description = String(description || label).slice(0, 127);
-  }
+}
+
+export async function createPayPalOrder({ amountUsd, iceyOrderNumber }) {
+  const accessToken = await getPayPalAccessToken();
   const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      intent: "CAPTURE",
-      purchase_units: [purchaseUnit],
-    }),
+    body: JSON.stringify(buildPayPalOrderBody({ amountUsd, iceyOrderNumber })),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -85,6 +88,23 @@ export async function createPayPalOrder({ amountUsd, iceyOrderNumber, descriptio
     throw error;
   }
   if (!data.id) throw new Error("PayPal create order failed");
+  return data;
+}
+
+export async function getPayPalOrder(orderId) {
+  const accessToken = await getPayPalAccessToken();
+  const id = String(orderId || "").trim();
+  if (!id) throw new Error("Missing PayPal order id");
+  const res = await fetch(`${PAYPAL_API}/v2/checkout/orders/${encodeURIComponent(id)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || "PayPal order lookup failed");
+  }
   return data;
 }
 
@@ -102,9 +122,11 @@ export async function capturePayPalOrder(orderId) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(
+    const error = new Error(
       data.message || data.details?.[0]?.description || "PayPal capture failed"
     );
+    error.paypalIssue = data.details?.[0]?.issue || "";
+    throw error;
   }
   const status = data.status;
   if (status !== "COMPLETED") {

@@ -1,4 +1,7 @@
 import { Client, Databases } from "node-appwrite";
+import { getPayPalOrder } from "../_lib/paypalServer.js";
+import { factsFromVerifiedOrder, paymentDecision, recoveryEligibility } from "../_lib/paypalCapture.js";
+import { logOrderRecovery } from "../_lib/iceyOrder.js";
 
 let client = null;
 let databases = null;
@@ -52,7 +55,41 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Server configuration error" });
   }
 
-  const { documentId, status } = req.body || {};
+  const { documentId, status, action } = req.body || {};
+
+  if (action === "reconcile") {
+    if (!documentId || typeof documentId !== "string") {
+      return res.status(400).json({ error: "Missing or invalid documentId" });
+    }
+    try {
+      const { databases: db } = getClient();
+      const doc = await db.getDocument(databaseId, collectionId, documentId);
+      if (recoveryEligibility(doc) !== "eligible") {
+        return res.status(400).json({ error: "This pending order cannot be checked with PayPal" });
+      }
+      const paypalOrder = await getPayPalOrder(doc.paypal_order_id);
+      const facts = factsFromVerifiedOrder(paypalOrder);
+      const decision = facts ? paymentDecision(doc, facts) : { action: "unpaid" };
+      if (decision.action !== "markPaid") {
+        return res.status(200).json({ success: true, action: decision.action });
+      }
+      const updated = await db.updateDocument(databaseId, collectionId, documentId, {
+        orderStatus: "paid",
+        paypal_status: "COMPLETED",
+        paypal_order_id: facts.paypalOrderId,
+        paypal_capture_id: facts.captureId,
+        amount: facts.amount,
+        totalAmount: facts.amount,
+        orderDate: new Date().toISOString(),
+      });
+      return res.status(200).json({ success: true, action: "updated", order: updated });
+    } catch (error) {
+      logOrderRecovery("admin-reconcile", {
+        message: error?.message || "PayPal check failed",
+      });
+      return res.status(502).json({ error: "PayPal could not be checked" });
+    }
+  }
 
   if (!documentId || typeof documentId !== "string") {
     return res.status(400).json({ error: "Missing or invalid documentId" });
