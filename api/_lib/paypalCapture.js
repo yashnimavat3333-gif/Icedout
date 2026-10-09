@@ -121,6 +121,19 @@ function rank(doc, facts) {
   return 1;
 }
 
+export function storedMoney(exactAmount) {
+  const exact = Math.round(Number(exactAmount) * 100) / 100;
+  if (!Number.isFinite(exact)) return { amount: 0, totalAmount: 0 };
+  return { amount: Math.trunc(exact), totalAmount: exact };
+}
+
+export function exactStoredAmount(existing) {
+  const total = Number(existing?.totalAmount);
+  if (Number.isFinite(total) && total > 0) return total;
+  const amount = Number(existing?.amount);
+  return Number.isFinite(amount) ? amount : NaN;
+}
+
 export function paymentDecision(existing, facts) {
   if (!facts?.orderNumber || !facts.captureId || !facts.paypalOrderId) {
     return { action: "ignore" };
@@ -128,7 +141,7 @@ export function paymentDecision(existing, facts) {
   if (!existing) return { action: "missing" };
   if (Number(existing.orderId) > HISTORICAL_ORDER_ID) return { action: "ignore" };
   if (!refersToSameIceyOrder(existing, facts)) return { action: "ignore" };
-  const storedAmount = Number(existing.amount);
+  const storedAmount = exactStoredAmount(existing);
   if (!Number.isFinite(storedAmount) || Math.abs(storedAmount - facts.amount) > 0.009) {
     return { action: "ignore" };
   }

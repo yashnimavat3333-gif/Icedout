@@ -57,16 +57,20 @@ function parseVariations(raw) {
   return list.map(parseVariationEntry).filter(Boolean);
 }
 
+function matchedVariation(doc, variationName) {
+  const variations = parseVariations(doc?.variations);
+  if (!variationName || !variations.length) return null;
+  const key = String(variationName).trim().toLowerCase();
+  return (
+    variations.find((entry) => {
+      const name = String(entry.name || entry.title || "").trim().toLowerCase();
+      return name && name === key;
+    }) || null
+  );
+}
+
 function unitPriceFromProduct(doc, variationName) {
-  const variations = parseVariations(doc.variations);
-  let v = null;
-  if (variationName && variations.length) {
-    const key = String(variationName).trim().toLowerCase();
-    v = variations.find((x) => {
-      const n = String(x.name || x.title || "").trim().toLowerCase();
-      return n && n === key;
-    });
-  }
+  const v = matchedVariation(doc, variationName);
   if (v && v.price !== undefined && v.price !== null && v.price !== "") {
     const varPrice = Number(v.price) || 0;
     const varDiscountPct = Number(v.discount) || 0;
@@ -76,6 +80,26 @@ function unitPriceFromProduct(doc, variationName) {
     return varPrice;
   }
   return Number(doc?.price) || 0;
+}
+
+export function buildCatalogLine(doc, line) {
+  const productId = String(line?.productId || "").trim();
+  const quantity = Math.max(1, Math.floor(Number(line?.quantity) || 1));
+  const requested = line?.variationName || null;
+  const unit = unitPriceFromProduct(doc, requested);
+  const matched = matchedVariation(doc, requested);
+  const images = Array.isArray(doc?.images) ? doc.images : [];
+  const item = {
+    productId,
+    name: doc?.name || "Item",
+    quantity,
+    unitPrice: unit,
+    lineTotal: roundMoney(unit * quantity),
+    imageFileId: images[0] ? String(images[0]) : "",
+  };
+  const variationName = matched ? String(matched.name || matched.title || "").trim() : "";
+  if (variationName) item.variationName = variationName;
+  return item;
 }
 
 function roundMoney(n) {
@@ -107,18 +131,13 @@ export async function computeCheckoutTotal({ items, couponCode }) {
       productsCollectionId,
       productId
     );
-    const unit = unitPriceFromProduct(doc, line.variationName || null);
-    const lineTotal = roundMoney(unit * quantity);
-    subtotal += lineTotal;
-    const images = Array.isArray(doc.images) ? doc.images : [];
-    lineItems.push({
+    const item = buildCatalogLine(doc, {
       productId,
-      name: doc.name || "Item",
       quantity,
-      unitPrice: unit,
-      lineTotal,
-      imageFileId: images[0] ? String(images[0]) : "",
+      variationName: line.variationName || null,
     });
+    subtotal += item.lineTotal;
+    lineItems.push(item);
   }
 
   subtotal = roundMoney(subtotal);

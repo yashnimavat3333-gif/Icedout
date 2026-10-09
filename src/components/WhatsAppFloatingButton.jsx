@@ -11,6 +11,11 @@ const WHATSAPP_PHONE_DIGITS = WHATSAPP_PHONE.replace(/[^\d]/g, "");
 const WHATSAPP_ENCODED_MESSAGE = encodeURIComponent(WHATSAPP_MESSAGE);
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE_DIGITS}?text=${WHATSAPP_ENCODED_MESSAGE}`;
 
+export function whatsAppHref(text) {
+  const message = String(text || WHATSAPP_MESSAGE);
+  return `https://wa.me/${WHATSAPP_PHONE_DIGITS}?text=${encodeURIComponent(message)}`;
+}
+
 // Pages where the floating button should be hidden
 const HIDDEN_ROUTES = ["/checkout"];
 

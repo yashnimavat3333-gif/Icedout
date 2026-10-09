@@ -8,6 +8,7 @@ import {
   missingPaymentDecision,
   paymentDecision,
   recoveryEligibility,
+  storedMoney,
 } from "../_lib/paypalCapture.js";
 import { logOrderRecovery } from "../_lib/iceyOrder.js";
 
@@ -141,13 +142,14 @@ export default async function handler(req, res) {
       if (decision.action !== "markPaid") {
         return res.status(200).json({ success: true, action: decision.action });
       }
+      const money = storedMoney(facts.amount);
       const updated = await db.updateDocument(databaseId, collectionId, documentId, {
         orderStatus: "paid",
         paypal_status: "COMPLETED",
         paypal_order_id: facts.paypalOrderId,
         paypal_capture_id: facts.captureId,
-        amount: facts.amount,
-        totalAmount: facts.amount,
+        amount: money.amount,
+        totalAmount: money.totalAmount,
         orderDate: new Date().toISOString(),
       });
       return res.status(200).json({ success: true, action: "updated", order: updated });

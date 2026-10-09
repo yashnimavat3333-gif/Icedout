@@ -28,6 +28,15 @@ function formatDate(iso) {
   }
 }
 
+function displayAmount(order) {
+  const total = Number(order?.totalAmount);
+  const amount = Number(order?.amount);
+  if (Number.isFinite(total) && (!Number.isFinite(amount) || Math.abs(total - amount) >= 0.009)) {
+    return total;
+  }
+  return Number.isFinite(amount) ? amount : null;
+}
+
 function formatAmount(val) {
   if (val == null) return "—";
   const n = Number(val);
@@ -43,6 +52,7 @@ function readOrderMeta(order) {
       imageFileId: parsed.imageFileId || parsed.lines?.[0]?.imageFileId || "",
       lines: Array.isArray(parsed.lines) ? parsed.lines : [],
       followUp: typeof parsed.followUp === "string" ? parsed.followUp : "",
+      customerEmail: typeof parsed.customerEmail === "string" ? parsed.customerEmail : "",
     };
   }
   return {
@@ -50,6 +60,7 @@ function readOrderMeta(order) {
     imageFileId: "",
     lines: Array.isArray(parsed) ? parsed : [],
     followUp: "",
+    customerEmail: "",
   };
 }
 
@@ -418,14 +429,13 @@ export default function AdminOrders() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap max-w-[120px] truncate">
-                        {order.userId || order.email || "—"}
+                        <div>{order.userId || order.email || "—"}</div>
+                        {meta.customerEmail && meta.customerEmail !== order.userId && (
+                          <div className="text-gray-500">{meta.customerEmail}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-white whitespace-nowrap">
-                        {formatAmount(
-                          Number(order.orderId) === 989107 && order.totalAmount != null
-                            ? order.totalAmount
-                            : order.amount ?? order.totalAmount
-                        )}
+                        {formatAmount(displayAmount(order))}
                       </td>
                       <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
                         {order.currency || "USD"}
@@ -495,7 +505,10 @@ export default function AdminOrders() {
                           <div className="space-y-1.5 min-w-[200px]">
                             {meta.lines.map((item, idx) => (
                               <div key={idx} className="bg-gray-800/50 rounded px-2 py-1.5 leading-relaxed">
-                                <div className="font-medium text-gray-200 truncate max-w-[200px]">{item.name || "Unnamed"}</div>
+                                <div className="font-medium text-gray-200 truncate max-w-[200px]">
+                                  {item.name || "Unnamed"}
+                                  {item.variationName ? <span className="text-gray-400 font-normal"> · {item.variationName}</span> : null}
+                                </div>
                                 <div className="text-gray-500 mt-0.5">
                                   Qty: {item.quantity ?? 1}
                                 </div>

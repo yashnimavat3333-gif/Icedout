@@ -9,9 +9,17 @@ import {
   paymentDecision,
   publicRecoveryError,
   recoveryEligibility,
+  storedMoney,
 } from "./paypalCapture.js";
-import { persistVerifiedCapture, shouldPreservePaidOrder } from "./iceyOrder.js";
+import { orderSnapshot, persistVerifiedCapture, shouldPreservePaidOrder } from "./iceyOrder.js";
+import {
+  ORDER_NOT_STORED,
+  captureCustomerResult,
+  clientCheckoutEvent,
+  savePendingWithRetry,
+} from "./checkoutPaymentState.js";
 import { buildPayPalOrderBody } from "./paypalServer.js";
+import { buildCatalogLine } from "./computeCheckoutTotal.js";
 
 const IMAGE_ID = "abcdef0123456789abcd";
 
@@ -152,6 +160,107 @@ test("an incomplete or mismatched PayPal order is not marked paid", () => {
   const repeated = factsFromVerifiedOrder(paypalOrder(), "CAP1");
   const paid = { ...pending, orderStatus: "paid", paypal_status: "COMPLETED", paypal_capture_id: "CAP1" };
   assert.equal(paymentDecision(paid, repeated).action, "duplicate");
+});
+
+test("a decimal PayPal total is stored exactly, paid once, and preserved with its variant", async () => {
+  assert.deepEqual(storedMoney(595.57), { amount: 595, totalAmount: 595.57 });
+  assert.equal(Number.isInteger(storedMoney(595.57).amount), true);
+
+  const product = {
+    name: "Watch",
+    price: 100,
+    images: [IMAGE_ID],
+    variations: [
+      { name: "Gold", price: 595.57 },
+      { name: "Silver", price: 400 },
+    ],
+  };
+  const gold = buildCatalogLine(product, { productId: "p1", quantity: 1, variationName: "gold" });
+  const plain = buildCatalogLine(product, { productId: "p2", quantity: 2, variationName: null });
+  const unknown = buildCatalogLine(product, { productId: "p3", quantity: 1, variationName: "Platinum" });
+  assert.equal(gold.variationName, "Gold");
+  assert.equal(gold.unitPrice, 595.57);
+  assert.equal(gold.imageFileId, IMAGE_ID);
+  assert.equal(plain.variationName, undefined);
+  assert.equal(plain.quantity, 2);
+  assert.equal(plain.unitPrice, 100);
+  assert.equal(unknown.variationName, undefined);
+  assert.equal(unknown.unitPrice, 100);
+
+  const items = orderSnapshot({
+    orderNumber: "ICEY-10050",
+    imageFileId: IMAGE_ID,
+    lineItems: [gold, plain],
+  });
+  const savedLines = JSON.parse(items).lines;
+  assert.equal(savedLines[0].variationName, "Gold");
+  assert.equal(Object.hasOwn(savedLines[1], "variationName"), false);
+
+  const neighbour = {
+    $id: "neighbour",
+    orderId: 989106,
+    orderStatus: "paid",
+    paypal_status: "COMPLETED",
+    amount: 892,
+    totalAmount: 892.5,
+    items: JSON.stringify({ orderNumber: "ICEY-989106", lines: [{ name: "Other", quantity: 1 }] }),
+  };
+  const pending = {
+    $id: "pending-cents",
+    orderId: 10050,
+    orderStatus: "pending",
+    paypal_status: "CREATED",
+    paypal_order_id: "PAYPALORDER1",
+    paypal_capture_id: "",
+    items,
+    amount: 595,
+    totalAmount: 595.57,
+    shipping_full_name: "Ava Stone",
+    shippingphone: "5551234567",
+    shippingAddress: "1 Main Street",
+  };
+  const db = memoryDb([neighbour, pending]);
+  const paypal = paypalOrder();
+  paypal.purchase_units[0].payments.captures[0].amount.value = "595.57";
+  const verified = factsFromVerifiedOrder(paypal, "CAP1");
+  assert.equal(paymentDecision(pending, verified).action, "markPaid");
+  assert.equal(paymentDecision(pending, { ...verified, amount: 595 }).action, "ignore");
+  assert.equal(paymentDecision(pending, { ...verified, amount: 10 }).action, "ignore");
+
+  const wrongReference = paypalOrder();
+  wrongReference.purchase_units[0].custom_id = "ICEY-10051";
+  wrongReference.purchase_units[0].invoice_id = "ICEY-10051";
+  wrongReference.purchase_units[0].payments.captures[0].amount.value = "595.57";
+  const rejected = await persistVerifiedCapture(db, factsFromVerifiedOrder(wrongReference, "CAP1"));
+  assert.equal(rejected.action, "ignore");
+  assert.equal(db.docs[1].orderStatus, "pending");
+  assert.equal(db.docs[1].paypal_capture_id, "");
+
+  const wrongAmount = paypalOrder();
+  wrongAmount.purchase_units[0].payments.captures[0].amount.value = "10.00";
+  const ignored = await persistVerifiedCapture(db, factsFromVerifiedOrder(wrongAmount, "CAP1"));
+  assert.equal(ignored.action, "ignore");
+  assert.equal(db.docs[1].orderStatus, "pending");
+  assert.equal(JSON.stringify(db.docs[0]), JSON.stringify(neighbour));
+
+  const first = await persistVerifiedCapture(db, verified);
+  const second = await persistVerifiedCapture(db, verified);
+  assert.equal(first.action, "updated");
+  assert.equal(second.action, "duplicate");
+  assert.equal(db.docs.length, 2);
+  assert.equal(db.docs[1].orderStatus, "paid");
+  assert.equal(db.docs[1].paypal_status, "COMPLETED");
+  assert.equal(db.docs[1].paypal_order_id, "PAYPALORDER1");
+  assert.equal(db.docs[1].paypal_capture_id, "CAP1");
+  assert.equal(db.docs[1].amount, 595);
+  assert.equal(Number.isInteger(db.docs[1].amount), true);
+  assert.equal(db.docs[1].totalAmount, 595.57);
+  assert.equal(db.docs[1].items, items);
+  assert.equal(db.docs[1].shipping_full_name, "Ava Stone");
+  assert.equal(db.docs[1].shippingphone, "5551234567");
+  assert.equal(db.docs[1].shippingAddress, "1 Main Street");
+  assert.equal(JSON.stringify(db.docs[0]), JSON.stringify(neighbour));
+  assert.equal(verified.orderNumber, "ICEY-10050");
 });
 
 test("PayPal receives only the amount and ICEY reference", () => {
@@ -390,4 +499,103 @@ test("historical orders and a different capture are not rewritten", () => {
     items: JSON.stringify({ orderNumber: "ICEY-10050", lines: [] }),
   };
   assert.equal(paymentDecision(other, factsFromVerifiedOrder(paypalOrder(), "CAP1")).action, "ignore");
+});
+
+test("a failed pending save does not open PayPal, and a confirmed capture is not shown as saved", async () => {
+  assert.equal(ORDER_NOT_STORED.body.paypalOpened, false);
+  assert.equal(ORDER_NOT_STORED.body.ok, false);
+  assert.match(ORDER_NOT_STORED.body.error, /not opened/);
+  assert.match(ORDER_NOT_STORED.body.error, /Nothing was charged/);
+
+  let saves = 0;
+  const recovered = await savePendingWithRetry(async () => {
+    saves += 1;
+    if (saves === 1) throw new Error("temporary storage failure");
+  });
+  assert.equal(recovered.ok, true);
+  assert.equal(saves, 2);
+
+  let opened = false;
+  const blocked = await savePendingWithRetry(async () => {
+    throw new Error("storage unavailable");
+  });
+  if (blocked.ok) opened = true;
+  assert.equal(blocked.ok, false);
+  assert.equal(opened, false);
+
+  const paid = paypalOrder();
+  paid.purchase_units[0].payments.captures[0].amount.value = "595.57";
+  const saved = captureCustomerResult({
+    paypalOrder: paid,
+    persistResult: { action: "updated", orderNumber: "ICEY-10050" },
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.ok, true);
+  assert.equal(saved.body.saved, true);
+  assert.equal(saved.body.captureId, "CAP1");
+
+  const again = captureCustomerResult({
+    paypalOrder: paid,
+    persistResult: { action: "duplicate", orderNumber: "ICEY-10050" },
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(again.body.ok, true);
+  assert.equal(again.body.code, "duplicate");
+
+  const wrongAmount = captureCustomerResult({
+    paypalOrder: paid,
+    persistResult: { action: "ignore", orderNumber: "ICEY-10050" },
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(wrongAmount.body.ok, false);
+  assert.equal(wrongAmount.body.saved, false);
+  assert.equal(wrongAmount.body.code, "payment-not-matched");
+
+  const wrongReference = captureCustomerResult({
+    paypalOrder: paid,
+    persistResult: { action: "missing", orderNumber: "ICEY-10051" },
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(wrongReference.body.ok, false);
+  assert.equal(wrongReference.body.code, "order-not-linked");
+
+  const databaseFailed = captureCustomerResult({
+    paypalOrder: paid,
+    persistError: new Error("database unavailable"),
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(databaseFailed.body.ok, false);
+  assert.equal(databaseFailed.body.paymentCaptured, true);
+  assert.equal(databaseFailed.body.saved, false);
+  assert.equal(databaseFailed.body.code, "order-save-failed");
+  assert.match(databaseFailed.body.error, /Do not pay again/);
+
+  const unconfirmed = captureCustomerResult({
+    lookupFailed: true,
+    requestedOrderId: "PAYPALORDER1",
+  });
+  assert.equal(unconfirmed.body.ok, false);
+  assert.equal(unconfirmed.body.code, "capture-unconfirmed");
+
+  const cancelled = clientCheckoutEvent("cancel");
+  const closed = clientCheckoutEvent("popup-closed");
+  assert.equal(cancelled.level, "notice");
+  assert.match(cancelled.message, /have not been charged/);
+  assert.match(closed.message, /WhatsApp/);
+
+  const snapshot = JSON.parse(orderSnapshot({
+    orderNumber: "ICEY-10050",
+    imageFileId: IMAGE_ID,
+    customerEmail: "customer@example.com",
+    lineItems: [{ productId: "p1", name: "Watch", quantity: 1, variationName: "Gold", unitPrice: 595.57, lineTotal: 595.57, imageFileId: IMAGE_ID }],
+  }));
+  assert.equal(snapshot.customerEmail, "customer@example.com");
+  assert.equal(snapshot.lines[0].variationName, "Gold");
+  const withoutEmail = JSON.parse(orderSnapshot({
+    orderNumber: "ICEY-10050",
+    imageFileId: IMAGE_ID,
+    lineItems: [{ productId: "p1", name: "Watch", quantity: 1, unitPrice: 10, lineTotal: 10, imageFileId: IMAGE_ID }],
+  }));
+  assert.equal(withoutEmail.customerEmail, undefined);
 });

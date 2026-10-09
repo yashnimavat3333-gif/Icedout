@@ -1,11 +1,13 @@
 import { computeCheckoutTotal } from "../_lib/computeCheckoutTotal.js";
 import { createPayPalOrder } from "../_lib/paypalServer.js";
 import { nextIceyNumber, saveIceyOrder, logOrderRecovery } from "../_lib/iceyOrder.js";
+import { ORDER_NOT_STORED, savePendingWithRetry } from "../_lib/checkoutPaymentState.js";
 
 function customerFrom(body) {
   return {
     customerName: String(body.customerName || "").trim(),
     customerPhone: String(body.customerPhone || "").trim(),
+    customerEmail: String(body.customerEmail || "").trim(),
     shippingAddress: String(body.shippingAddress || "").trim(),
   };
 }
@@ -50,15 +52,14 @@ export default async function handler(req, res) {
         paypalOrderId: "",
         paypalCaptureId: "",
       };
-      try {
-        await saveIceyOrder(pendingOrder);
-      } catch (err) {
+      const saved = await savePendingWithRetry(() => saveIceyOrder(pendingOrder));
+      if (!saved.ok) {
         logOrderRecovery("pending-save", {
           orderNumber,
           amount: totals.totalUsd,
-          message: err?.message || "save failed",
+          message: saved.error?.message || "save failed",
         });
-        return res.status(500).json({ error: "Could not create PayPal order" });
+        return res.status(ORDER_NOT_STORED.status).json(ORDER_NOT_STORED.body);
       }
       try {
         order = await createPayPalOrder({

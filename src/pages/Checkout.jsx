@@ -10,6 +10,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
+import { whatsAppHref } from "../components/WhatsAppFloatingButton";
 import { cartLinesForServer, getLeadId, getStoredCoupon, setStoredCoupon } from "../lib/offerStorage";
 
 const RECOVERY_TOKEN_KEY = "iceyout_checkout_recovery_token";
@@ -224,6 +225,9 @@ const CheckoutPage = () => {
   const [userOrders, setUserOrders] = useState([]);
 
   const [paypalError, setPaypalError] = useState("");
+  const [paypalNotice, setPaypalNotice] = useState("");
+  const [heldPayment, setHeldPayment] = useState(null);
+  const [recheckingPayment, setRecheckingPayment] = useState(false);
   const [serverQuote, setServerQuote] = useState(null);
 
   const formRef = useRef(null);
@@ -557,6 +561,7 @@ const CheckoutPage = () => {
       couponCode: coupon?.code || null,
       customerName: fd.fullName || "",
       customerPhone: fd.phone || "",
+      customerEmail: fd.email || "",
       shippingAddress: [fd.address, fd.city, fd.zipCode, fd.country].filter(Boolean).join(", "),
     };
   };
@@ -1072,11 +1077,102 @@ const CheckoutPage = () => {
                   <CheckoutPayPalButtons
                     buildCartPayload={buildPayPalCartPayload}
                     validateShipping={validateShippingFields}
-                    onPaid={handlePayPalPaid}
-                    onError={(msg) => setPaypalError(msg || "PayPal checkout error")}
+                    blocked={Boolean(heldPayment)}
+                    onPaid={(payment) => {
+                      setHeldPayment(null);
+                      setPaypalNotice("");
+                      handlePayPalPaid(payment);
+                    }}
+                    onError={(msg) => {
+                      setPaypalNotice("");
+                      setPaypalError(msg || "PayPal checkout error");
+                    }}
+                    onNotice={(msg) => {
+                      setPaypalError("");
+                      setPaypalNotice(msg || "");
+                    }}
+                    onHold={(payment) => {
+                      setPaypalError("");
+                      setPaypalNotice("");
+                      setHeldPayment(payment);
+                    }}
                   />
+                  {paypalNotice && (
+                    <p className="mt-3 text-sm text-amber-800 text-center">{paypalNotice}</p>
+                  )}
                   {paypalError && (
-                    <p className="mt-3 text-sm text-red-600 text-center">{paypalError}</p>
+                    <div className="mt-3 text-sm text-red-700 text-center">
+                      <p>{paypalError}</p>
+                      <a
+                        className="mt-2 inline-block font-semibold underline"
+                        href={whatsAppHref("Hi Iceyout, I need help paying for my order. PayPal did not open and I was not charged.")}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Message us on WhatsApp
+                      </a>
+                    </div>
+                  )}
+                  {heldPayment && (
+                    <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+                      <p className="font-semibold">PayPal payment needs attention</p>
+                      <p className="mt-1">{heldPayment.message}</p>
+                      {heldPayment.orderNumber && (
+                        <p className="mt-2 font-mono text-xs">Order reference: {heldPayment.orderNumber}</p>
+                      )}
+                      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <button
+                          type="button"
+                          disabled={recheckingPayment || !heldPayment.orderID}
+                          onClick={async () => {
+                            setRecheckingPayment(true);
+                            try {
+                              const res = await fetch("/api/paypal/capture-order", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ orderID: heldPayment.orderID }),
+                                signal: AbortSignal.timeout(20000),
+                              });
+                              const body = await res.json().catch(() => ({}));
+                              if (res.ok && body.ok && body.saved) {
+                                setHeldPayment(null);
+                                handlePayPalPaid({
+                                  orderID: heldPayment.orderID,
+                                  captureId: body.captureId,
+                                  orderNumber: body.orderNumber || heldPayment.orderNumber,
+                                });
+                                return;
+                              }
+                              setHeldPayment((current) => ({
+                                ...current,
+                                message: body.error || current?.message,
+                              }));
+                            } catch {
+                              setHeldPayment((current) => ({
+                                ...current,
+                                message:
+                                  "We still could not confirm the saved order. Do not pay again. Message us on WhatsApp with your order reference.",
+                              }));
+                            } finally {
+                              setRecheckingPayment(false);
+                            }
+                          }}
+                          className="rounded-lg bg-gray-900 px-4 py-2 font-semibold text-white disabled:opacity-60"
+                        >
+                          {recheckingPayment ? "Checking…" : "Check this payment again"}
+                        </button>
+                        <a
+                          className="rounded-lg border border-gray-900 px-4 py-2 text-center font-semibold text-gray-900"
+                          href={whatsAppHref(
+                            `Hi Iceyout, PayPal confirmed my payment but the order still needs help. Reference: ${heldPayment.orderNumber || heldPayment.orderID}`
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Message us on WhatsApp
+                        </a>
+                      </div>
+                    </div>
                   )}
                 </div>
 

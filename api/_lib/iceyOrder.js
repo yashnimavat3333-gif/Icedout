@@ -1,5 +1,5 @@
 import { Client, Databases, ID, Query } from "node-appwrite";
-import { factsFromVerifiedOrder, matchIceyDocument, paymentDecision } from "./paypalCapture.js";
+import { factsFromVerifiedOrder, matchIceyDocument, paymentDecision, storedMoney } from "./paypalCapture.js";
 
 function getDb() {
   const endpoint = process.env.APPWRITE_ENDPOINT;
@@ -41,19 +41,31 @@ export async function nextIceyNumber() {
   return { sequence, orderNumber: `ICEY-${sequence}` };
 }
 
-function snapshotPayload({ orderNumber, imageFileId, lineItems }) {
-  return JSON.stringify({
+export function orderSnapshot({ orderNumber, imageFileId, lineItems, customerEmail }) {
+  const payload = {
     orderNumber,
     imageFileId: imageFileId || "",
-    lines: (lineItems || []).map((line) => ({
-      productId: line.productId,
-      name: line.name,
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      lineTotal: line.lineTotal,
-      imageFileId: line.imageFileId || "",
-    })),
-  });
+    lines: (lineItems || []).map((line) => {
+      const saved = {
+        productId: line.productId,
+        name: line.name,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        lineTotal: line.lineTotal,
+        imageFileId: line.imageFileId || "",
+      };
+      const variationName = String(line.variationName || "").trim();
+      if (variationName) saved.variationName = variationName;
+      return saved;
+    }),
+  };
+  const email = String(customerEmail || "").trim();
+  if (email && email.length <= 200 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    payload.customerEmail = email;
+    if (JSON.stringify(payload).length <= 999) return JSON.stringify(payload);
+    delete payload.customerEmail;
+  }
+  return JSON.stringify(payload);
 }
 
 function orderFields({
@@ -63,6 +75,7 @@ function orderFields({
   lineItems,
   customerName,
   customerPhone,
+  customerEmail,
   shippingAddress,
   amount,
   orderStatus,
@@ -78,8 +91,7 @@ function orderFields({
     shippingAddress: shippingAddress || "",
     shippingphone: customerPhone || "",
     shipping_full_name: customerName || "",
-    amount,
-    totalAmount: amount,
+    ...storedMoney(amount),
     currency: "USD",
     orderStatus,
     payment_method: "paypal",
@@ -87,7 +99,7 @@ function orderFields({
     paypal_order_id: paypalOrderId || "",
     paypal_capture_id: paypalCaptureId || "",
     customerId: sequence,
-    items: snapshotPayload({ orderNumber, imageFileId, lineItems }),
+    items: orderSnapshot({ orderNumber, imageFileId, lineItems, customerEmail }),
   };
 }
 
@@ -122,13 +134,13 @@ export async function markIceyOrderPaid({
     throw new Error("ICEY order record was not found");
   }
   const paidAmount = Number(amount);
+  const money = Number.isFinite(paidAmount) ? storedMoney(paidAmount) : null;
   await databases.updateDocument(databaseId, collectionId, existing.$id, {
     orderStatus: "paid",
     paypal_status: "COMPLETED",
     paypal_order_id: paypalOrderId || existing.paypal_order_id || "",
     paypal_capture_id: captureId || "",
-    amount: Number.isFinite(paidAmount) ? paidAmount : existing.amount,
-    totalAmount: Number.isFinite(paidAmount) ? paidAmount : existing.totalAmount,
+    ...(money ? money : {}),
     orderDate: paidAt || new Date().toISOString(),
   });
   return existing;
@@ -211,13 +223,14 @@ export async function persistVerifiedCapture(db, facts, paidAt) {
   }
 
   const when = paidAt || new Date().toISOString();
+  const money = storedMoney(facts.amount);
   await databases.updateDocument(databaseId, collectionId, existing.$id, {
     orderStatus: "paid",
     paypal_status: "COMPLETED",
     paypal_order_id: facts.paypalOrderId || existing.paypal_order_id || "",
     paypal_capture_id: facts.captureId || "",
-    amount: facts.amount,
-    totalAmount: facts.amount,
+    amount: money.amount,
+    totalAmount: money.totalAmount,
     orderDate: when,
   });
   return { action: "updated", orderNumber: facts.orderNumber };
