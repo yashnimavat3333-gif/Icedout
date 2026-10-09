@@ -53,7 +53,7 @@ export default function DiscountOfferPopup() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Enter a valid email address or phone number.");
+        setError(data.error || "Enter a valid phone number.");
         return;
       }
       if (!applyGet10) {
@@ -149,16 +149,18 @@ export default function DiscountOfferPopup() {
               Unlock your exclusive 10% discount.
             </p>
             <p className="mt-1 text-sm text-gray-600">
-              Enter your email address or phone number to receive your offer.
+              Enter your phone number to receive your offer.
             </p>
             <label className="block mt-5 text-xs uppercase tracking-wide text-gray-500">
-              Email or phone
+              Phone number
               <input
+                type="tel"
+                inputMode="tel"
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
-                autoComplete="email"
+                autoComplete="tel"
                 className="mt-2 w-full border border-gray-300 rounded-xl px-4 py-3 text-base text-gray-900"
-                placeholder="you@email.com or phone number"
+                placeholder="Phone number"
               />
             </label>
             <label className="mt-4 flex items-start gap-3 text-sm text-gray-600">

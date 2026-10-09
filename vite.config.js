@@ -52,7 +52,7 @@ function paypalApiDevPlugin() {
             },
           }
 
-          await handler({ method: req.method, body }, mockRes)
+          await handler({ method: req.method, headers: req.headers, body }, mockRes)
         } catch (err) {
           console.error('[paypal-api-dev]', err)
           res.statusCode = 500

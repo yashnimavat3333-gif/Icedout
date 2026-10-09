@@ -57,14 +57,7 @@ export function allowLeadWrite(ip) {
 
 export function parseContact(raw) {
   const value = String(raw || "").replace(/[\u0000-\u001F]/g, "").trim();
-  if (!value) return { ok: false, error: "Enter an email address or phone number." };
-  if (value.includes("@")) {
-    const email = value.toLowerCase();
-    if (email.length > 200 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { ok: false, error: "Enter a valid email address." };
-    }
-    return { ok: true, email, phone: "" };
-  }
+  if (!value || value.includes("@")) return { ok: false, error: "Enter a valid phone number." };
   const phone = value.replace(/\D/g, "");
   if (phone.length < 8 || phone.length > 15) {
     return { ok: false, error: "Enter a valid phone number." };
