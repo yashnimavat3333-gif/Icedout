@@ -1,7 +1,7 @@
 import { capturePayPalOrder, getPayPalOrder } from "../_lib/paypalServer.js";
 import { applyVerifiedPayPalPayment, logOrderRecovery } from "../_lib/iceyOrder.js";
 import { loadCompletedCapture } from "../_lib/paypalCapture.js";
-import { captureCustomerResult } from "../_lib/checkoutPaymentState.js";
+import { captureCustomerResult, unchargedPayPalResult } from "../_lib/checkoutPaymentState.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -56,7 +56,9 @@ export default async function handler(req, res) {
     });
     return res.status(result.status).json(result.body);
   } catch (err) {
-    console.error("[paypal/capture-order]", err?.message || err);
+    console.error("[paypal/capture-order]", err?.paypalIssue || err?.message || err);
+    const uncharged = unchargedPayPalResult(err?.paypalIssue);
+    if (uncharged) return res.status(uncharged.status).json(uncharged.body);
     const result = captureCustomerResult({
       lookupFailed: true,
       requestedOrderId: orderID,

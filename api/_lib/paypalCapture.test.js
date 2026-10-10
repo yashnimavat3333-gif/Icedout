@@ -17,6 +17,7 @@ import {
   captureCustomerResult,
   clientCheckoutEvent,
   savePendingWithRetry,
+  unchargedPayPalResult,
 } from "./checkoutPaymentState.js";
 import { buildPayPalOrderBody } from "./paypalServer.js";
 import { buildCatalogLine } from "./computeCheckoutTotal.js";
@@ -186,6 +187,16 @@ test("a decimal PayPal total is stored exactly, paid once, and preserved with it
   assert.equal(plain.unitPrice, 100);
   assert.equal(unknown.variationName, undefined);
   assert.equal(unknown.unitPrice, 100);
+  const fractional = buildCatalogLine(
+    {
+      name: "Watch",
+      price: 0,
+      variations: [{ name: "Superclone", price: 1515.67, discount: 25 }],
+    },
+    { productId: "p4", quantity: 1, variationName: "Superclone" }
+  );
+  assert.equal(fractional.unitPrice, 1136.75);
+  assert.equal(fractional.lineTotal, 1136.75);
 
   const items = orderSnapshot({
     orderNumber: "ICEY-10050",
@@ -570,6 +581,10 @@ test("a failed pending save does not open PayPal, and a confirmed capture is not
   assert.equal(databaseFailed.body.saved, false);
   assert.equal(databaseFailed.body.code, "order-save-failed");
   assert.match(databaseFailed.body.error, /Do not pay again/);
+
+  assert.equal(unchargedPayPalResult("ORDER_NOT_APPROVED").body.code, "unpaid");
+  assert.equal(unchargedPayPalResult("INSTRUMENT_DECLINED").body.paymentCaptured, false);
+  assert.equal(unchargedPayPalResult("INTERNAL_SERVER_ERROR"), null);
 
   const unconfirmed = captureCustomerResult({
     lookupFailed: true,

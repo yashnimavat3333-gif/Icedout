@@ -75,9 +75,9 @@ function unitPriceFromProduct(doc, variationName) {
     const varPrice = Number(v.price) || 0;
     const varDiscountPct = Number(v.discount) || 0;
     if (varDiscountPct > 0 && varDiscountPct < 100) {
-      return Math.max(0, varPrice * (1 - varDiscountPct / 100));
+      return roundMoney(Math.max(0, varPrice * (1 - varDiscountPct / 100)));
     }
-    return varPrice;
+    return roundMoney(varPrice);
   }
   return Number(doc?.price) || 0;
 }

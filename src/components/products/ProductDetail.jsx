@@ -332,7 +332,7 @@ export default function ProductDetail() {
         const varPrice = Number(v.price) || 0;
         const varDiscountPct = Number(v.discount) || 0;
         if (varDiscountPct > 0 && varDiscountPct < 100) {
-          const discounted = Math.max(0, varPrice * (1 - varDiscountPct / 100));
+          const discounted = Math.round(Math.max(0, varPrice * (1 - varDiscountPct / 100)) * 100) / 100;
           return {
             price: discounted,
             originalPrice: varPrice,
@@ -953,7 +953,7 @@ export default function ProductDetail() {
 
         <div className="flex items-center space-x-4">
           <p className="text-2xl font-medium text-gray-900">
-            ${Number(pricing?.price || 0).toLocaleString()}
+            ${Number(pricing?.price || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
           {pricing?.originalPrice ? (
             <>

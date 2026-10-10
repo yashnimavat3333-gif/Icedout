@@ -136,6 +136,7 @@ export async function capturePayPalOrder(orderId) {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
+    body: "{}",
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

@@ -129,7 +129,7 @@ function getCardPricing(product) {
             v.discountPct > 0 &&
             v.discountPct < 100
           ) {
-            const discounted = Math.max(0, v.price * (1 - v.discountPct / 100));
+            const discounted = Math.round(Math.max(0, v.price * (1 - v.discountPct / 100)) * 100) / 100;
             return { price: discounted, compareAt: v.price };
           }
 

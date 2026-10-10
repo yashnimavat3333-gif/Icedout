@@ -43,6 +43,31 @@ export function clientCheckoutEvent(type) {
   return null;
 }
 
+const UNCHARGED_PAYPAL_ISSUES = new Set([
+  "ORDER_NOT_APPROVED",
+  "ORDER_EXPIRED",
+  "INSTRUMENT_DECLINED",
+  "PAYER_ACTION_REQUIRED",
+  "TRANSACTION_REFUSED",
+  "PAYMENT_DENIED",
+  "REDIRECT_PAYER_FOR_ALTERNATE_FUNDING",
+]);
+
+export function unchargedPayPalResult(issue) {
+  if (!UNCHARGED_PAYPAL_ISSUES.has(String(issue || ""))) return null;
+  return {
+    status: 400,
+    body: {
+      ok: false,
+      paymentCaptured: false,
+      saved: false,
+      code: "unpaid",
+      error:
+        "PayPal has not completed this payment. Nothing was charged. You can try PayPal again.",
+    },
+  };
+}
+
 export function captureCustomerResult({
   lookupFailed = false,
   paypalOrder = null,
