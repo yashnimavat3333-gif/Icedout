@@ -1,12 +1,14 @@
 /**
- * +$50 on final customer price for Luxury Watch Superclone variants only.
+ * +$50 on the current customer price for Superclone variants on watch listings.
+ * Covers Luxury Watch and Plain Watch. Other variants and categories are left unchanged.
  * Usage: node --env-file=.env scripts/apply-luxury-superclone-plus-50.mjs [--dry-run]
  */
 import { Client, Databases, Query } from "node-appwrite";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const INCREASE = 50;
-const IDEMPOTENCY_TAG = "luxury-superclone-final-plus-50-v1";
+const IDEMPOTENCY_TAG = "watch-superclone-final-plus-50-2026-10-10";
+const WATCH_CATEGORIES = ["Luxury Watch", "Plain Watch"];
 const SUPERCLONE = "superclone";
 
 const endpoint =
@@ -62,19 +64,21 @@ function hasTag(tags) {
   return Array.isArray(tags) && tags.includes(IDEMPOTENCY_TAG);
 }
 
-async function listLuxuryWatches() {
+async function listWatchListings() {
   const docs = [];
-  let offset = 0;
   const limit = 100;
-  while (true) {
-    const res = await readDb.listDocuments(databaseId, collectionId, [
-      Query.equal("categories", "Luxury Watch"),
-      Query.limit(limit),
-      Query.offset(offset),
-    ]);
-    docs.push(...res.documents);
-    offset += res.documents.length;
-    if (offset >= res.total || res.documents.length === 0) break;
+  for (const category of WATCH_CATEGORIES) {
+    let offset = 0;
+    while (true) {
+      const res = await readDb.listDocuments(databaseId, collectionId, [
+        Query.equal("categories", category),
+        Query.limit(limit),
+        Query.offset(offset),
+      ]);
+      docs.push(...res.documents);
+      offset += res.documents.length;
+      if (offset >= res.total || res.documents.length === 0) break;
+    }
   }
   return docs;
 }
@@ -89,7 +93,7 @@ const report = {
   errors: [],
 };
 
-const products = await listLuxuryWatches();
+const products = await listWatchListings();
 report.productsFound = products.length;
 
 for (const doc of products) {
@@ -157,15 +161,23 @@ for (const doc of products) {
     continue;
   }
 
-  try {
-    await writeDb.updateDocument(databaseId, collectionId, doc.$id, {
-      variations: parsed.map((v) => JSON.stringify(v)),
-      tags: newTags,
-    });
-    report.productsUpdated++;
-  } catch (err) {
-    report.errors.push({ id: doc.$id, reason: err.message || String(err) });
+  let saved = false;
+  let lastError = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      await writeDb.updateDocument(databaseId, collectionId, doc.$id, {
+        variations: parsed.map((v) => JSON.stringify(v)),
+        tags: newTags,
+      });
+      saved = true;
+      break;
+    } catch (err) {
+      lastError = err;
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
   }
+  if (saved) report.productsUpdated++;
+  else report.errors.push({ id: doc.$id, reason: lastError?.message || String(lastError) });
 }
 
 console.log(JSON.stringify(report, null, 2));
