@@ -30,9 +30,9 @@ const ImageCarousel = () => {
     e.preventDefault();
     // Use instant navigation - no transitions or delays
     if (typeof navigate === 'function') {
-      navigate("/categories", { replace: false });
+      navigate("/shop", { replace: false });
     } else if (typeof window !== 'undefined' && window.location) {
-      window.location.href = '/categories';
+      window.location.href = '/shop';
     }
   };
 
@@ -172,13 +172,16 @@ const ImageCarousel = () => {
               fontDisplay: 'swap'
             }}
           >
-            Hand-Set VVS Diamond Luxury Watches &amp; Jewellery
+            Iced-Out Watches &amp; Jewellery
           </h1>
+          <p className="text-sm md:text-base text-white text-center mb-5 max-w-xl" style={{ pointerEvents: "none", textShadow: "0 1px 8px rgba(0,0,0,0.45)" }}>
+            Statement pieces with free worldwide shipping and PayPal checkout.
+          </p>
           
           {/* CLS Fix: Reserve space for button */}
           <button
             onClick={handleCTAClick}
-            className="px-6 py-3 bg-white text-gray-900 rounded-md hover:bg-gray-100 font-medium"
+            className="px-8 py-3 bg-black text-white rounded-md hover:bg-neutral-800 font-medium"
             style={{
               // CLS Fix: Reserve explicit height for button
               minHeight: '3rem',
@@ -190,9 +193,9 @@ const ImageCarousel = () => {
               // Prevent layout shift
               flexShrink: 0
             }}
-            aria-label="Explore our luxury collections"
+            aria-label="Shop the collection"
           >
-            Explore Collections
+            Shop the Collection
           </button>
         </div>
       </div>

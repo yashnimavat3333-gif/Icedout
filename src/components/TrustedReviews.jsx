@@ -1,87 +1,93 @@
-import React from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import productService from "../appwrite/config";
+import { whatsAppHref } from "./WhatsAppFloatingButton";
+
+const WANTED = [
+  { key: "luxury watch", label: "Watches" },
+  { key: "bracelet", label: "Bracelets" },
+  { key: "chains", label: "Chains" },
+];
 
 function TrustedReviews() {
+  const [cards, setCards] = useState(
+    WANTED.map((item) => ({ ...item, to: `/category/${encodeURIComponent(item.key)}`, image: "" }))
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    productService
+      .listCategories()
+      .then((res) => {
+        if (cancelled) return;
+        const categories = res?.documents || [];
+        setCards(
+          WANTED.map((item) => {
+            const match = categories.find(
+              (cat) => String(cat?.name || "").trim().toLowerCase() === item.key
+            );
+            const name = match?.name || item.key;
+            return {
+              ...item,
+              to: `/category/${encodeURIComponent(String(name).toLowerCase())}`,
+              image: match?.image || "",
+            };
+          })
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <section style={{ background: "#ffffff", padding: "80px 20px" }}>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", textAlign: "center" }}>
-        
-        <h2 style={{ fontSize: "36px", fontWeight: "600", marginBottom: "12px" }}>
-          Trusted by Customers Worldwide
+    <section className="bg-white px-5 py-16 sm:px-8">
+      <div className="mx-auto max-w-6xl">
+        <h2 className="text-center text-3xl font-light text-gray-900 sm:text-4xl">
+          Find the piece, then check out.
         </h2>
-
-        <p style={{ color: "#666", maxWidth: "640px", margin: "0 auto 50px" }}>
-          Real feedback from verified customers who chose Iceyout for premium timepieces.
+        <p className="mx-auto mt-3 max-w-xl text-center text-gray-600">
+          Start with a category. Each product page shows the price, options, and size before PayPal opens.
         </p>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "30px",
-          }}
-        >
-          <div style={cardStyle}>
-            <div style={stars}>★★★★★</div>
-            <p style={text}>
-              “The craftsmanship is outstanding. The watch feels premium and looks even better in person.”
-            </p>
-            <strong>Michael Johnson, USA</strong>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={stars}>★★★★★</div>
-            <p style={text}>
-              “Solid build, clean design, and fast delivery. Definitely worth the price.”
-            </p>
-            <strong>Daniel Carter, USA</strong>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={stars}>★★★★★</div>
-            <p style={text}>
-              “Exactly as shown on the website. Smooth buying experience and great customer support.”
-            </p>
-            <strong>Ethan Williams, USA</strong>
-          </div>
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+          {cards.map((item) => (
+            <Link
+              key={item.key}
+              to={item.to}
+              className="group relative block min-h-72 overflow-hidden bg-neutral-900"
+            >
+              {item.image ? (
+                <img
+                  src={item.image}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+              ) : null}
+              <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-black/10" />
+              <span className="absolute inset-x-0 bottom-0 p-5 text-xl text-white">
+                Shop {item.label}
+              </span>
+            </Link>
+          ))}
         </div>
-
-        <div style={{ marginTop: "50px" }}>
+        <ul className="mt-8 flex flex-col items-center gap-2 text-sm text-gray-700 sm:flex-row sm:justify-center sm:gap-8">
+          <li>Free worldwide shipping</li>
+          <li>PayPal or debit/credit card</li>
+          <li>7-day easy returns</li>
+        </ul>
+        <p className="mt-6 text-center text-sm">
           <a
-            href="mailto:support@iceyout.com?subject=Customer Review"
-            style={{
-              display: "inline-block",
-              padding: "14px 36px",
-              borderRadius: "30px",
-              background: "#000",
-              color: "#fff",
-              textDecoration: "none",
-              fontWeight: "500",
-            }}
+            href={whatsAppHref("Hi Iceyout, I want help choosing a piece.")}
+            className="text-gray-900 underline underline-offset-4"
           >
-            Write a Review
+            Not sure which piece? Message us on WhatsApp
           </a>
-        </div>
+        </p>
       </div>
     </section>
   );
 }
-
-const cardStyle = {
-  background: "#fafafa",
-  padding: "32px",
-  borderRadius: "16px",
-  textAlign: "left",
-};
-
-const stars = {
-  color: "#f5b301",
-  fontSize: "18px",
-};
-
-const text = {
-  margin: "18px 0",
-  color: "#333",
-  lineHeight: "1.6",
-};
 
 export default TrustedReviews;
