@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { cartLinesForServer, getLeadId } from "../lib/offerStorage";
+import { isPromoGiftId } from "../../api/_lib/promoGift.js";
 
 const CartContext = createContext();
 
@@ -58,7 +59,7 @@ export const CartProvider = ({ children }) => {
       const normalized = Array.isArray(parsed)
         ? parsed
             .map(normalizeItem)
-            .filter(Boolean)
+            .filter((item) => item && !isPromoGiftId(item.$id ?? item.id))
             .map((item) => ({
               ...item,
               quantity: clampQuantity(item.quantity),
@@ -93,7 +94,7 @@ export const CartProvider = ({ children }) => {
   // add or increment (normalize item before using)
   const addToCart = (rawItem) => {
     const item = normalizeItem(rawItem);
-    if (!item) return;
+    if (!item || isPromoGiftId(item.$id ?? item.id)) return;
 
     setAddedTick((n) => n + 1);
     setCart((prev) => {
@@ -160,7 +161,7 @@ export const CartProvider = ({ children }) => {
     if (!Array.isArray(items)) return;
     const normalized = items
       .map(normalizeItem)
-      .filter(Boolean)
+      .filter((it) => it && !isPromoGiftId(it.$id ?? it.id))
       .map((it) => ({ ...it, quantity: clampQuantity(it.quantity) }));
     setCart(normalized);
   };

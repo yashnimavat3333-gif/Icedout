@@ -1,3 +1,5 @@
+import { isPromoGiftId } from "../../api/_lib/promoGift.js";
+
 export const OFFER_CLAIMED_KEY = "iceyout_offer_claimed";
 export const OFFER_DISMISSED_KEY = "iceyout_offer_dismissed";
 export const LEAD_ID_KEY = "iceyout_lead_id";
@@ -59,6 +61,7 @@ export function setStoredCoupon(code) {
 export function cartLinesForServer(cart) {
   if (!Array.isArray(cart)) return [];
   return cart
+    .filter((it) => !isPromoGiftId(it?.$id ?? it?.id))
     .slice(0, 30)
     .map((it) => ({
       productId: String(it?.$id ?? it?.id ?? "").trim(),

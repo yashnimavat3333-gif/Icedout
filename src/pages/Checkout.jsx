@@ -11,6 +11,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import CheckoutPayPalButtons from "../components/CheckoutPayPalButtons";
 import { whatsAppHref } from "../components/WhatsAppFloatingButton";
+import { cartQualifiesForGift, PROMO_GIFT_DETAIL, PROMO_GIFT_NAME } from "../../api/_lib/promoGift.js";
+import { EarringPhoto } from "../components/PromoOffer";
 import { cartLinesForServer, getLeadId, getStoredCoupon, setStoredCoupon } from "../lib/offerStorage";
 
 const RECOVERY_TOKEN_KEY = "iceyout_checkout_recovery_token";
@@ -574,12 +576,17 @@ const CheckoutPage = () => {
     setCompletedOrder({
       orderId: orderNumber || captureId || orderID,
       shippingAddress,
-      items: items.map((it) => ({
-        name: it.name || "Item",
-        quantity: it.quantity || 1,
-        price: Number(it.price) || 0,
-        size: it.selectedSize || null,
-      })),
+      items: [
+        ...items.map((it) => ({
+          name: it.name || "Item",
+          quantity: it.quantity || 1,
+          price: Number(it.price) || 0,
+          size: it.selectedSize || null,
+        })),
+        ...(cartQualifiesForGift(items)
+          ? [{ name: PROMO_GIFT_NAME, quantity: 1, price: 0, size: PROMO_GIFT_DETAIL }]
+          : []),
+      ],
     });
     setOrderStatus({
       type: "success",
@@ -820,6 +827,19 @@ const CheckoutPage = () => {
                   ))
                 )}
               </div>
+              {cartQualifiesForGift(cartItems) ? (
+                <div className="mb-6 border border-[#c6a15b]/50 bg-[#111] p-4 text-white">
+                  <p className="text-xs uppercase tracking-[0.18em] text-[#d4bc86]">Your free gift is included</p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <EarringPhoto className="h-16 w-16 shrink-0" alt="VVS moissanite stud earrings" />
+                    <div className="flex-1">
+                      <p className="text-sm">{PROMO_GIFT_DETAIL}</p>
+                      <p className="text-xs text-[#d9d0c3]">Your complimentary gift will be included with your order.</p>
+                    </div>
+                    <p className="text-sm">$0.00</p>
+                  </div>
+                </div>
+              ) : null}
               <div className="border-t pt-4 space-y-2">
                 {/* Coupon */}
                 <div className="mb-3">

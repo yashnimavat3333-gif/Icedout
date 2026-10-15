@@ -3,6 +3,8 @@ import { useCart } from "../context/CartContext";
 import { Trash2 } from "react-feather";
 import { Link, useNavigate } from "react-router-dom";
 import { cartLinesForServer, getStoredCoupon } from "../lib/offerStorage";
+import { cartQualifiesForGift, PROMO_GIFT_DETAIL, PROMO_GIFT_NAME } from "../../api/_lib/promoGift.js";
+import { EarringPhoto } from "../components/PromoOffer";
 
 const CartPage = () => {
   const { cart, removeFromCart, clearCart } = useCart();
@@ -127,6 +129,18 @@ const CartPage = () => {
           </div>
         ))}
       </div>
+
+      {cartQualifiesForGift(cart) ? (
+        <div className="mt-6 flex items-center gap-4 border border-[#c6a15b]/50 bg-[#111] p-4 text-white">
+          <EarringPhoto className="h-16 w-16 shrink-0" alt="VVS moissanite stud earrings" />
+          <div className="flex-1">
+            <p className="text-xs uppercase tracking-[0.18em] text-[#d4bc86]">{PROMO_GIFT_NAME}</p>
+            <p className="mt-1 text-sm">{PROMO_GIFT_DETAIL}</p>
+            <p className="text-xs text-[#d9d0c3]">One complimentary pair. Quantity and price cannot be changed.</p>
+          </div>
+          <p className="text-sm font-medium">$0.00</p>
+        </div>
+      ) : null}
 
       <div className="mt-8 flex justify-between items-center border-t pt-4">
         <div>

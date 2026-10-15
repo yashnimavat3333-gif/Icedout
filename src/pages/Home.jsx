@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from "react";
 import ImageCarousel from "../components/ImageCarousel";
+import PromoOffer from "../components/PromoOffer";
 
 // Lazy load components below the fold for better initial load performance
 const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
@@ -18,6 +19,7 @@ const SectionLoader = () => (
 function Home() {
   return (
     <div className="w-full min-h-screen bg-white">
+      <PromoOffer />
       {/* Hero Image - Load immediately (above fold) */}
       <ImageCarousel />
 

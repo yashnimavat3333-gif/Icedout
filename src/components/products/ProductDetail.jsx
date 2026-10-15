@@ -18,6 +18,7 @@ import SpinnerLoader from "../SpinnerLoader";
 import ProductCard from "./ProductCard";
 import parse from "html-react-parser";
 import ProductReviews from "../Review";
+import { GiftIncludedNote } from "../PromoOffer";
 
 const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
 
@@ -914,6 +915,8 @@ export default function ProductDetail() {
             </>
           ) : null}
         </div>
+
+        {Number(pricing?.price) > 0 ? <GiftIncludedNote /> : null}
 
         <p className="text-sm text-gray-600">
           Free worldwide shipping · PayPal checkout · 7-day easy returns

@@ -56,6 +56,7 @@ export function orderSnapshot({ orderNumber, imageFileId, lineItems, customerEma
       };
       const variationName = String(line.variationName || "").trim();
       if (variationName) saved.variationName = variationName;
+      if (line.promotionalGift) saved.gift = true;
       return saved;
     }),
   };

@@ -1,4 +1,5 @@
 import { Client, Databases, Query } from "node-appwrite";
+import { paidRequestLines, payableTotal, withPromoGift } from "./promoGift.js";
 
 function getAppwrite() {
   const endpoint = process.env.APPWRITE_ENDPOINT;
@@ -118,10 +119,14 @@ export async function computeCheckoutTotal({ items, couponCode }) {
   const { databases, databaseId, productsCollectionId, couponsCollectionId } =
     getAppwrite();
 
-  let subtotal = 0;
-  const lineItems = [];
+  const requested = paidRequestLines(items);
+  if (requested.length === 0) {
+    throw new Error("Cart is empty");
+  }
 
-  for (const line of items) {
+  const priced = [];
+
+  for (const line of requested) {
     const productId = String(line?.productId || "").trim();
     const quantity = Math.max(1, Math.floor(Number(line?.quantity) || 1));
     if (!productId) throw new Error("Invalid cart line");
@@ -131,15 +136,15 @@ export async function computeCheckoutTotal({ items, couponCode }) {
       productsCollectionId,
       productId
     );
-    const item = buildCatalogLine(doc, {
+    priced.push(buildCatalogLine(doc, {
       productId,
       quantity,
       variationName: line.variationName || null,
-    });
-    subtotal += item.lineTotal;
-    lineItems.push(item);
+    }));
   }
 
+  const lineItems = withPromoGift(priced);
+  let subtotal = payableTotal(lineItems);
   subtotal = roundMoney(subtotal);
 
   let discountAmount = 0;
