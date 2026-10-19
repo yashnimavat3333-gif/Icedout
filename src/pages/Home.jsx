@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from "react";
 import ImageCarousel from "../components/ImageCarousel";
 import PromoOffer from "../components/PromoOffer";
+import LiveVideoCall from "../components/LiveVideoCall";
 
 // Lazy load components below the fold for better initial load performance
 const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
@@ -53,6 +54,7 @@ function Home() {
               <span>Secure PayPal Checkout</span>
             </div>
           </div>
+          <LiveVideoCall variant="home" />
         </div>
       </section>
 

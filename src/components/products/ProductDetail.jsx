@@ -19,6 +19,7 @@ import ProductCard from "./ProductCard";
 import parse from "html-react-parser";
 import ProductReviews from "../Review";
 import { GiftIncludedNote } from "../PromoOffer";
+import LiveVideoCall from "../LiveVideoCall";
 
 const UPLOADED_FALLBACK = "/mnt/data/6accbf97-f6dc-4ccc-bb6f-222bb1cd9d8c.png"; // local uploaded image fallback
 
@@ -1090,6 +1091,8 @@ export default function ProductDetail() {
             Add to Cart
           </button>
         </div>
+
+        <LiveVideoCall variant="product" productName={product.name || ""} />
 
         <div className="mt-3 text-center text-xs text-gray-600 leading-relaxed">
           <p className="font-medium text-gray-700">Secure checkout with PayPal</p>
