@@ -6,6 +6,7 @@ import LiveVideoCall from "../components/LiveVideoCall";
 // Lazy load components below the fold for better initial load performance
 const TrustedReviews = lazy(() => import("../components/TrustedReviews"));
 const ShopByCategory = lazy(() => import("../components/ShopByCategory"));
+const CustomerTrust = lazy(() => import("../components/CustomerTrust"));
 
 // Loading placeholder component
 const SectionLoader = () => (
@@ -61,6 +62,10 @@ function Home() {
       {/* ICEDOUT Collections - Lazy load (above reviews) */}
       <Suspense fallback={<SectionLoader />}>
         <ShopByCategory />
+      </Suspense>
+
+      <Suspense fallback={<SectionLoader />}>
+        <CustomerTrust />
       </Suspense>
 
       {/* ⭐ Trusted Reviews - Lazy load (moved to bottom) */}
