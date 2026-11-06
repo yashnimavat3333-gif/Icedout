@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from "react";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import { PayPalScriptProvider, PayPalButtons, FUNDING } from "@paypal/react-paypal-js";
 import { clientCheckoutEvent } from "../../api/_lib/checkoutPaymentState.js";
 
 const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID || "";
@@ -33,6 +33,7 @@ export default function CheckoutPayPalButtons({
       clientId,
       currency: "USD",
       intent: "capture",
+      disableFunding: "card",
     }),
     []
   );
@@ -65,6 +66,7 @@ export default function CheckoutPayPalButtons({
       <div className="mt-2">
         <p className="text-base font-semibold text-gray-800 mb-3">Pay with PayPal</p>
         <PayPalButtons
+          fundingSource={FUNDING.PAYPAL}
           style={{ layout: "vertical", color: "gold", shape: "rect", label: "paypal" }}
           disabled={busy || blocked}
           createOrder={async () => {

@@ -226,6 +226,7 @@ const CheckoutPage = () => {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [userOrders, setUserOrders] = useState([]);
 
+  const [applePayError, setApplePayError] = useState("");
   const [paypalError, setPaypalError] = useState("");
   const [paypalNotice, setPaypalNotice] = useState("");
   const [heldPayment, setHeldPayment] = useState(null);
@@ -547,6 +548,35 @@ const CheckoutPage = () => {
     }
     setErrors({});
     return null;
+  };
+
+  const handleApplePayWhatsApp = () => {
+    const shippingErr = validateShippingFields();
+    if (shippingErr) {
+      setApplePayError(shippingErr);
+      return;
+    }
+
+    setApplePayError("");
+    const fd = formDataRef.current || formData;
+    const items = cartItemsRef.current || cartItems;
+    const productLines = items
+      .map((it) => `${it.name || "Item"} x${it.quantity || 1} — $${(Number(it.price) || 0).toFixed(2)}`)
+      .join("\n");
+    const giftLine = cartQualifiesForGift(items)
+      ? `\n${PROMO_GIFT_NAME} x1 — $0.00 (${PROMO_GIFT_DETAIL})`
+      : "";
+    const total = (finalAmountRef.current || finalAmount || 0).toFixed(2);
+    const message =
+      `Hi, I want to pay with Apple Pay.\n\n` +
+      `Name: ${fd.fullName}\n` +
+      `Email: ${fd.email}\n` +
+      `Phone: ${fd.phone}\n` +
+      `Address: ${fd.address}, ${fd.city}, ${fd.zipCode}, ${fd.country}\n\n` +
+      `Products:\n${productLines}${giftLine}\n\n` +
+      `Total: $${total}`;
+
+    window.open(whatsAppHref(message), "_blank", "noopener,noreferrer");
   };
 
   const buildPayPalCartPayload = () => {
@@ -1194,6 +1224,34 @@ const CheckoutPage = () => {
                       </div>
                     </div>
                   )}
+
+                  <div className="mt-6 pt-6 border-t border-gray-200">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" aria-hidden="true">
+                          <path d="M16.37 12.72c.02 2.18 1.91 2.9 1.93 2.91-.02.05-.3 1.03-1 2.04-.6.88-1.23 1.76-2.21 1.78-.97.02-1.28-.57-2.39-.57-1.11 0-1.46.55-2.37.59-.95.04-1.67-.95-2.28-1.83-1.24-1.8-2.19-5.08-.91-7.3.63-1.1 1.77-1.8 3-1.82.94-.02 1.82.63 2.39.63.57 0 1.64-.78 2.77-.67.47.02 1.8.19 2.65 1.44-.07.04-1.58.92-1.56 2.8zM14.7 6.3c.5-.61.84-1.46.75-2.3-.72.03-1.6.48-2.12 1.09-.46.54-.87 1.4-.76 2.22.81.06 1.63-.41 2.13-1.01z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-base font-semibold text-gray-800">Pay with Apple Pay</p>
+                        <p className="text-sm text-gray-500">
+                          To get your Apple Pay link, click the button below. We send it on WhatsApp.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleApplePayWhatsApp}
+                      className="w-full mt-3 px-5 py-3.5 bg-black hover:bg-gray-900 text-white text-base font-semibold rounded-xl transition-colors duration-200"
+                    >
+                      Pay with Apple Pay
+                    </button>
+
+                    {applePayError && (
+                      <p className="mt-3 text-sm text-red-600 text-center">{applePayError}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mt-6 flex items-center justify-center gap-2 text-sm text-gray-500">

@@ -11,6 +11,7 @@ import {
   storedMoney,
 } from "../_lib/paypalCapture.js";
 import { logOrderRecovery } from "../_lib/iceyOrder.js";
+import { deliverOrderConfirmation } from "../_lib/orderConfirmationEmail.js";
 
 let client = null;
 let databases = null;
@@ -152,6 +153,16 @@ export default async function handler(req, res) {
         totalAmount: money.totalAmount,
         orderDate: new Date().toISOString(),
       });
+      const emailResult = await deliverOrderConfirmation({
+        order: { ...doc, ...updated },
+        payerEmail: paypalOrder?.payer?.email_address,
+      });
+      if (!emailResult.sent) {
+        logOrderRecovery("confirmation-email", {
+          orderNumber: facts.orderNumber,
+          message: emailResult.reason || "not sent",
+        });
+      }
       return res.status(200).json({ success: true, action: "updated", order: updated });
     } catch (error) {
       logOrderRecovery("admin-reconcile", {

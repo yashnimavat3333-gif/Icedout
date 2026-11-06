@@ -234,7 +234,18 @@ export async function persistVerifiedCapture(db, facts, paidAt) {
     totalAmount: money.totalAmount,
     orderDate: when,
   });
-  return { action: "updated", orderNumber: facts.orderNumber };
+  return {
+    action: "updated",
+    orderNumber: facts.orderNumber,
+    order: {
+      ...existing,
+      orderStatus: "paid",
+      paypal_status: "COMPLETED",
+      paypal_capture_id: facts.captureId || existing.paypal_capture_id || "",
+      totalAmount: money.totalAmount,
+      amount: money.amount,
+    },
+  };
 }
 
 export async function applyVerifiedPayPalPayment(paypalOrder, options = {}) {

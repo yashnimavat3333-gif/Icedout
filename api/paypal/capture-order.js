@@ -2,6 +2,7 @@ import { capturePayPalOrder, getPayPalOrder } from "../_lib/paypalServer.js";
 import { applyVerifiedPayPalPayment, logOrderRecovery } from "../_lib/iceyOrder.js";
 import { loadCompletedCapture } from "../_lib/paypalCapture.js";
 import { captureCustomerResult, unchargedPayPalResult } from "../_lib/checkoutPaymentState.js";
+import { deliverOrderConfirmation } from "../_lib/orderConfirmationEmail.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -28,6 +29,18 @@ export default async function handler(req, res) {
         persistResult = await applyVerifiedPayPalPayment(completed.order, {
           captureId: firstCapture?.status === "COMPLETED" ? firstCapture.id || "" : "",
         });
+        if (persistResult?.action === "updated") {
+          const emailResult = await deliverOrderConfirmation({
+            order: persistResult.order,
+            payerEmail: completed.order?.payer?.email_address,
+          });
+          if (!emailResult.sent) {
+            logOrderRecovery("confirmation-email", {
+              orderNumber: persistResult.orderNumber,
+              message: emailResult.reason || "not sent",
+            });
+          }
+        }
       } catch (err) {
         persistError = err;
         const purchase = completed.order?.purchase_units?.[0] || {};
